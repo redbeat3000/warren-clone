@@ -2,57 +2,84 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Chama Management System Design System - Apple-like minimalism */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Core Brand Colors - Chama System */
+    --background: 0 0% 100%; /* Pure white #FFFFFF */
+    --foreground: 0 0% 0%; /* Pure black #000000 */
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 0 0% 0%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 0 0% 0%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Primary Green - Rich green for buttons */
+    --primary: 142 76% 47%; /* #22C55E */
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 142 76% 42%;
+    --primary-active: 142 76% 37%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    /* Secondary - Subtle grays for backgrounds */
+    --secondary: 0 0% 98%;
+    --secondary-foreground: 0 0% 0%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    /* Muted - Light grays for disabled states */
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 40%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* Accent Orange - Dark orange for borders and highlights */
+    --accent: 18 85% 53%; /* #D35400 */
+    --accent-foreground: 0 0% 100%;
+    --accent-light: 18 85% 60%;
+    --accent-border: 18 85% 48%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    /* Status Colors */
+    --success: 142 76% 47%;
+    --success-foreground: 0 0% 100%;
+    --warning: 43 96% 56%;
+    --warning-foreground: 0 0% 0%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    /* Neutral Grays */
+    --border: 0 0% 90%;
+    --input: 0 0% 96%;
+    --input-border: 0 0% 85%;
+    --ring: 18 85% 53%;
 
+    /* Radius - Apple-like rounded corners */
     --radius: 0.5rem;
+    --radius-lg: 1rem;
+    --radius-sm: 0.25rem;
 
+    /* Shadows - Subtle depth */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+    /* Spacing - Generous whitespace */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --spacing-2xl: 3rem;
+
+    /* Typography - System font stack */
+    --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+
+    /* Sidebar specific */
     --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-foreground: 0 0% 0%;
+    --sidebar-primary: 142 76% 47%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 96%;
+    --sidebar-accent-foreground: 0 0% 0%;
+    --sidebar-border: 0 0% 90%;
+    --sidebar-ring: 18 85% 53%;
   }
 
   .dark {
@@ -100,6 +127,65 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+  }
+}
+
+@layer components {
+  /* Button variants using design system */
+  .btn-primary {
+    @apply bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium transition-all duration-200 hover:bg-primary-hover active:bg-primary-active focus:outline-none focus:ring-2 focus:ring-accent-border;
+  }
+  
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground px-6 py-3 rounded-lg font-medium transition-all duration-200 hover:bg-muted border border-border focus:outline-none focus:ring-2 focus:ring-accent-border;
+  }
+  
+  .btn-outline {
+    @apply bg-transparent text-foreground px-6 py-3 rounded-lg font-medium border-2 border-accent-border transition-all duration-200 hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-accent-border;
+  }
+
+  /* Card components */
+  .card-elevated {
+    @apply bg-card text-card-foreground rounded-lg border border-border shadow-lg;
+  }
+  
+  .card-flat {
+    @apply bg-card text-card-foreground rounded-lg border border-border;
+  }
+
+  /* Interactive elements */
+  .interactive-hover {
+    @apply transition-all duration-200 hover:scale-105 cursor-pointer;
+  }
+  
+  .fade-in-up {
+    @apply animate-slide-up;
+  }
+
+  /* Status indicators */
+  .status-active {
+    @apply bg-success text-success-foreground;
+  }
+  
+  .status-pending {
+    @apply bg-warning text-warning-foreground;
+  }
+  
+  .status-inactive {
+    @apply bg-muted text-muted-foreground;
+  }
+  
+  .status-overdue {
+    @apply bg-destructive text-destructive-foreground;
+  }
+
+  /* Layout utilities */
+  .container-main {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+  
+  .section-spacing {
+    @apply py-xl;
   }
 }
