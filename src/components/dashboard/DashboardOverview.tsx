@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   UsersIcon, 
@@ -9,56 +9,18 @@ import {
   ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { useSupabaseQuery, useSupabaseStats } from '@/hooks/useSupabaseQuery';
+import { supabase } from '@/integrations/supabase/client';
 
-// Sample data - will be replaced with real data from API
-const monthlyContributions = [
-  { month: 'Jan', amount: 45000 },
-  { month: 'Feb', amount: 52000 },
-  { month: 'Mar', amount: 48000 },
-  { month: 'Apr', amount: 61000 },
-  { month: 'May', amount: 58000 },
-  { month: 'Jun', amount: 67000 },
-];
-
-const loanDistribution = [
-  { name: 'Active', value: 12, color: '#22C55E' },
-  { name: 'Overdue', value: 3, color: '#EF4444' },
-  { name: 'Pending', value: 2, color: '#F59E0B' },
-];
-
-const stats = [
-  {
-    name: 'Total Members',
-    value: '127',
-    change: '+5',
-    changeType: 'increase',
-    icon: UsersIcon,
-  },
-  {
-    name: 'Active Loans',
-    value: '17',
-    change: '+2',
-    changeType: 'increase',
-    icon: BanknotesIcon,
-  },
-  {
-    name: 'Available Cash',
-    value: 'KES 245,000',
-    change: '+12%',
-    changeType: 'increase',
-    icon: CurrencyDollarIcon,
-  },
-  {
-    name: 'Monthly Target',
-    value: '87%',
-    change: '+3%',
-    changeType: 'increase',
-    icon: ChartBarIcon,
-  },
-];
 
 interface StatCardProps {
-  stat: typeof stats[0];
+  stat: {
+    name: string;
+    value: string;
+    change: string;
+    changeType: string;
+    icon: any;
+  };
   index: number;
 }
 
@@ -88,6 +50,77 @@ function StatCard({ stat, index }: StatCardProps) {
 }
 
 export default function DashboardOverview() {
+  const stats = useSupabaseStats();
+  const { data: contributions, loading: contributionsLoading } = useSupabaseQuery(
+    'contributions', 
+    'amount, contribution_date', 
+    []
+  );
+  const { data: loans } = useSupabaseQuery('loans', 'status', []);
+  const { data: recentActivity } = useSupabaseQuery(
+    'contributions', 
+    '*, users!inner(first_name, last_name)', 
+    []
+  );
+
+  // Process monthly contributions
+  const monthlyContributions = React.useMemo(() => {
+    if (!contributions.length) return [];
+    
+    const monthlyData: { [key: string]: number } = {};
+    contributions.forEach((c: any) => {
+      const month = new Date(c.contribution_date).toLocaleDateString('en', { month: 'short' });
+      monthlyData[month] = (monthlyData[month] || 0) + parseFloat(c.amount || 0);
+    });
+    
+    return Object.entries(monthlyData).map(([month, amount]) => ({ month, amount }));
+  }, [contributions]);
+
+  // Process loan distribution
+  const loanDistribution = React.useMemo(() => {
+    const statusCounts = loans.reduce((acc: any, loan: any) => {
+      acc[loan.status] = (acc[loan.status] || 0) + 1;
+      return acc;
+    }, {});
+    
+    return [
+      { name: 'Active', value: statusCounts.active || 0, color: '#22C55E' },
+      { name: 'Overdue', value: statusCounts.overdue || 0, color: '#EF4444' },
+      { name: 'Pending', value: statusCounts.pending || 0, color: '#F59E0B' },
+    ];
+  }, [loans]);
+
+  const dashboardStats = [
+    {
+      name: 'Total Members',
+      value: stats.totalMembers.toString(),
+      change: '+5',
+      changeType: 'increase',
+      icon: UsersIcon,
+    },
+    {
+      name: 'Active Loans',
+      value: stats.activeLoans.toString(),
+      change: '+2',
+      changeType: 'increase',
+      icon: BanknotesIcon,
+    },
+    {
+      name: 'Available Cash',
+      value: `KES ${stats.availableCash.toLocaleString()}`,
+      change: '+12%',
+      changeType: 'increase',
+      icon: CurrencyDollarIcon,
+    },
+    {
+      name: 'Total Contributions',
+      value: `KES ${stats.totalContributions.toLocaleString()}`,
+      change: '+3%',
+      changeType: 'increase',
+      icon: ChartBarIcon,
+    },
+  ];
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -111,7 +144,7 @@ export default function DashboardOverview() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat, index) => (
+        {dashboardStats.map((stat, index) => (
           <StatCard key={stat.name} stat={stat} index={index} />
         ))}
       </div>
@@ -218,11 +251,7 @@ export default function DashboardOverview() {
           </button>
         </div>
         <div className="space-y-4">
-          {[
-            { type: 'contribution', member: 'Alice Wanjiku', amount: 'KES 5,000', time: '2 hours ago' },
-            { type: 'loan', member: 'John Kamau', amount: 'KES 15,000', time: '4 hours ago' },
-            { type: 'payment', member: 'Mary Njoki', amount: 'KES 2,500', time: '1 day ago' },
-          ].map((activity, index) => (
+          {recentActivity.slice(0, 3).map((activity: any, index: number) => (
             <motion.div
               key={index}
               initial={{ opacity: 0, x: -20 }}
@@ -231,18 +260,19 @@ export default function DashboardOverview() {
               className="flex items-center justify-between py-3 border-b border-border last:border-0"
             >
               <div className="flex items-center space-x-3">
-                <div className={`h-2 w-2 rounded-full ${
-                  activity.type === 'contribution' ? 'bg-success' :
-                  activity.type === 'loan' ? 'bg-warning' : 'bg-primary'
-                }`}></div>
+                <div className="h-2 w-2 rounded-full bg-success"></div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">{activity.member}</p>
-                  <p className="text-xs text-muted-foreground capitalize">{activity.type}</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {activity.users?.first_name} {activity.users?.last_name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Contribution</p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm font-medium text-foreground">{activity.amount}</p>
-                <p className="text-xs text-muted-foreground">{activity.time}</p>
+                <p className="text-sm font-medium text-foreground">KES {parseFloat(activity.amount || 0).toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">
+                  {new Date(activity.contribution_date).toLocaleDateString()}
+                </p>
               </div>
             </motion.div>
           ))}
