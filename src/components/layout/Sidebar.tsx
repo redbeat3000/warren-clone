@@ -13,7 +13,6 @@ import {
   ClipboardDocumentListIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/hooks/useAuth';
-import { useRoleSwitcher } from './RoleSwitcher';
 
 interface SidebarProps {
   activeSection: string;
@@ -35,14 +34,10 @@ const allNavigation = [
 
 export default function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
   const { authUser, isAdmin } = useAuth();
-  const { demoRole, isDemoMode } = useRoleSwitcher();
-  
-  // Get current role (either demo role or actual user role)
-  const currentRole = isDemoMode ? demoRole : authUser?.role;
   
   // Filter navigation based on user role
   const navigation = allNavigation.filter(item => 
-    currentRole && item.roles.includes(currentRole)
+    authUser?.role && item.roles.includes(authUser.role)
   );
   return (
     <motion.div 
@@ -112,15 +107,15 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
         >
           <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
             <span className="text-primary-foreground text-sm font-medium">
-              {(isDemoMode ? demoRole : authUser?.first_name)?.charAt(0)?.toUpperCase() || 'U'}
+              {authUser?.first_name?.charAt(0)?.toUpperCase() || 'U'}
             </span>
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-sidebar-foreground truncate">
-              {isDemoMode ? `Demo ${demoRole}` : authUser?.full_name || `${authUser?.first_name} ${authUser?.last_name}`}
+              {authUser?.full_name || `${authUser?.first_name} ${authUser?.last_name}`}
             </p>
             <p className="text-xs text-sidebar-foreground/70 truncate capitalize">
-              {currentRole} {isDemoMode && '(Demo)'}
+              {authUser?.role}
             </p>
           </div>
         </motion.div>
