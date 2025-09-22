@@ -12,26 +12,38 @@ import {
   Cog6ToothIcon,
   ClipboardDocumentListIcon
 } from '@heroicons/react/24/outline';
+import { useAuth } from '@/hooks/useAuth';
+import { useRoleSwitcher } from './RoleSwitcher';
 
 interface SidebarProps {
   activeSection: string;
   onSectionChange: (section: string) => void;
 }
 
-const navigation = [
-  { name: 'Dashboard', id: 'dashboard', icon: HomeIcon },
-  { name: 'Members', id: 'members', icon: UsersIcon },
-  { name: 'Contributions', id: 'contributions', icon: CurrencyDollarIcon },
-  { name: 'Loans', id: 'loans', icon: BanknotesIcon },
-  { name: 'Fines', id: 'fines', icon: ExclamationTriangleIcon },
-  { name: 'Expenses', id: 'expenses', icon: ArrowTrendingDownIcon },
-  { name: 'Dividends', id: 'dividends', icon: ChartBarIcon },
-  { name: 'Reports', id: 'reports', icon: ClipboardDocumentListIcon },
-  { name: 'Messages', id: 'messages', icon: ChatBubbleLeftRightIcon },
-  { name: 'Settings', id: 'settings', icon: Cog6ToothIcon },
+const allNavigation = [
+  { name: 'Dashboard', id: 'dashboard', icon: HomeIcon, roles: ['chairperson', 'treasurer', 'secretary', 'member', 'viewer'] },
+  { name: 'Members', id: 'members', icon: UsersIcon, roles: ['chairperson', 'treasurer', 'secretary'] },
+  { name: 'Contributions', id: 'contributions', icon: CurrencyDollarIcon, roles: ['chairperson', 'treasurer', 'secretary', 'member'] },
+  { name: 'Loans', id: 'loans', icon: BanknotesIcon, roles: ['chairperson', 'treasurer', 'secretary', 'member'] },
+  { name: 'Fines', id: 'fines', icon: ExclamationTriangleIcon, roles: ['chairperson', 'treasurer', 'secretary'] },
+  { name: 'Expenses', id: 'expenses', icon: ArrowTrendingDownIcon, roles: ['chairperson', 'treasurer'] },
+  { name: 'Dividends', id: 'dividends', icon: ChartBarIcon, roles: ['chairperson', 'treasurer'] },
+  { name: 'Reports', id: 'reports', icon: ClipboardDocumentListIcon, roles: ['chairperson', 'treasurer', 'secretary'] },
+  { name: 'Messages', id: 'messages', icon: ChatBubbleLeftRightIcon, roles: ['chairperson', 'secretary'] },
+  { name: 'Settings', id: 'settings', icon: Cog6ToothIcon, roles: ['chairperson'] },
 ];
 
 export default function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
+  const { authUser, isAdmin } = useAuth();
+  const { demoRole, isDemoMode } = useRoleSwitcher();
+  
+  // Get current role (either demo role or actual user role)
+  const currentRole = isDemoMode ? demoRole : authUser?.role;
+  
+  // Filter navigation based on user role
+  const navigation = allNavigation.filter(item => 
+    currentRole && item.roles.includes(currentRole)
+  );
   return (
     <motion.div 
       initial={{ x: -280 }}
@@ -99,14 +111,16 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
           className="flex items-center space-x-3"
         >
           <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground text-sm font-medium">A</span>
+            <span className="text-primary-foreground text-sm font-medium">
+              {(isDemoMode ? demoRole : authUser?.first_name)?.charAt(0)?.toUpperCase() || 'U'}
+            </span>
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-sidebar-foreground truncate">
-              Admin User
+              {isDemoMode ? `Demo ${demoRole}` : authUser?.full_name || `${authUser?.first_name} ${authUser?.last_name}`}
             </p>
-            <p className="text-xs text-sidebar-foreground/70 truncate">
-              Chairperson
+            <p className="text-xs text-sidebar-foreground/70 truncate capitalize">
+              {currentRole} {isDemoMode && '(Demo)'}
             </p>
           </div>
         </motion.div>

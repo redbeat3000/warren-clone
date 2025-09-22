@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from './Sidebar';
 import Header from './Header';
 import DashboardOverview from '../dashboard/DashboardOverview';
 import MembersList from '../members/MembersList';
+import RestrictedMembersView from '../members/RestrictedMembersView';
 import ContributionsView from '../contributions/ContributionsView';
 import LoansView from '../loans/LoansView';
+import { AccessDenied } from '../common/AccessDenied';
 import { XMarkIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '@/hooks/useAuth';
+import { useRoleSwitcher } from './RoleSwitcher';
 
 // Placeholder components for other sections
 const FinesView = () => (
@@ -51,9 +55,24 @@ const SettingsView = () => (
   </div>
 );
 
+// Role-based component rendering
+const getRoleBasedComponent = (section: string, role: string | null | undefined) => {
+  // Members section has different views based on role
+  if (section === 'members') {
+    if (role && ['chairperson', 'treasurer', 'secretary'].includes(role)) {
+      return MembersList; // Full admin view
+    } else {
+      return RestrictedMembersView; // Limited member view
+    }
+  }
+  
+  // Other sections use default components
+  return sectionComponents[section as keyof typeof sectionComponents];
+};
+
 const sectionComponents = {
   dashboard: DashboardOverview,
-  members: MembersList,
+  members: MembersList, // This will be overridden by getRoleBasedComponent
   contributions: ContributionsView,
   loans: LoansView,
   fines: FinesView,
@@ -80,8 +99,56 @@ const sectionTitles = {
 export default function MainLayout() {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { authUser } = useAuth();
+  const { demoRole, isDemoMode } = useRoleSwitcher();
 
-  const ActiveComponent = sectionComponents[activeSection as keyof typeof sectionComponents];
+  // Get current role (either demo role or actual user role)
+  const currentRole = isDemoMode ? demoRole : authUser?.role;
+
+  // Define which sections are accessible by each role
+  const rolePermissions = {
+    chairperson: ['dashboard', 'members', 'contributions', 'loans', 'fines', 'expenses', 'dividends', 'reports', 'messages', 'settings'],
+    treasurer: ['dashboard', 'members', 'contributions', 'loans', 'fines', 'expenses', 'dividends', 'reports'],
+    secretary: ['dashboard', 'members', 'contributions', 'loans', 'fines', 'reports', 'messages'],
+    member: ['dashboard', 'contributions', 'loans'],
+    viewer: ['dashboard']
+  };
+
+  // Check if current user has access to active section
+  const hasAccess = currentRole && rolePermissions[currentRole as keyof typeof rolePermissions]?.includes(activeSection);
+
+  // If user doesn't have access to current section, redirect to dashboard
+  useEffect(() => {
+    if (currentRole && !hasAccess) {
+      setActiveSection('dashboard');
+    }
+  }, [currentRole, hasAccess]);
+
+  const ActiveComponent = getRoleBasedComponent(activeSection, currentRole);
+
+  // Show access denied if user doesn't have permission for this section
+  if (currentRole && !hasAccess) {
+    return (
+      <div className="h-screen bg-background overflow-hidden">
+        <div className="flex h-full">
+          <div className="hidden lg:block">
+            <Sidebar activeSection="dashboard" onSectionChange={setActiveSection} />
+          </div>
+          <div className="flex-1 flex flex-col min-w-0">
+            <Header title="Access Denied" subtitle="Chama Management System" />
+            <main className="flex-1 overflow-auto">
+              <div className="p-6">
+                <AccessDenied 
+                  currentRole={currentRole}
+                  onGoBack={() => setActiveSection('dashboard')}
+                />
+              </div>
+            </main>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen bg-background overflow-hidden">

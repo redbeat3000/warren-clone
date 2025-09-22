@@ -11,6 +11,8 @@ import {
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useSupabaseQuery, useSupabaseStats } from '@/hooks/useSupabaseQuery';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { useRoleSwitcher } from '../layout/RoleSwitcher';
 
 
 interface StatCardProps {
@@ -51,6 +53,13 @@ function StatCard({ stat, index }: StatCardProps) {
 
 export default function DashboardOverview() {
   const stats = useSupabaseStats();
+  const { authUser } = useAuth();
+  const { demoRole, isDemoMode } = useRoleSwitcher();
+  
+  // Get current role (either demo role or actual user role)
+  const currentRole = isDemoMode ? demoRole : authUser?.role;
+  const isAdmin = currentRole && ['chairperson', 'treasurer', 'secretary'].includes(currentRole);
+  
   const { data: contributions, loading: contributionsLoading } = useSupabaseQuery(
     'contributions', 
     'amount, contribution_date', 
@@ -98,23 +107,23 @@ export default function DashboardOverview() {
       changeType: 'increase',
       icon: UsersIcon,
     },
-    {
+    ...(isAdmin ? [{
       name: 'Active Loans',
       value: stats.activeLoans.toString(),
       change: '+2',
       changeType: 'increase',
       icon: BanknotesIcon,
-    },
-    {
+    }] : []),
+    ...(isAdmin ? [{
       name: 'Available Cash',
       value: `KES ${stats.availableCash.toLocaleString()}`,
       change: '+12%',
       changeType: 'increase',
       icon: CurrencyDollarIcon,
-    },
+    }] : []),
     {
-      name: 'Total Contributions',
-      value: `KES ${stats.totalContributions.toLocaleString()}`,
+      name: currentRole === 'viewer' ? 'Your Contributions' : 'Total Contributions',
+      value: `KES ${currentRole === 'viewer' ? '15,000' : stats.totalContributions.toLocaleString()}`,
       change: '+3%',
       changeType: 'increase',
       icon: ChartBarIcon,
@@ -131,7 +140,12 @@ export default function DashboardOverview() {
       >
         <div>
           <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Welcome back! Here's what's happening with your Chama.</p>
+          <p className="text-muted-foreground mt-1">
+            {isDemoMode 
+              ? `Demo Mode: Viewing as ${demoRole} • Here's what's happening with your Chama.`
+              : "Welcome back! Here's what's happening with your Chama."
+            }
+          </p>
         </div>
         <motion.button
           whileHover={{ scale: 1.02 }}
@@ -149,93 +163,97 @@ export default function DashboardOverview() {
         ))}
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Monthly Contributions Trend */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.5 }}
-          className="card-elevated p-6"
-        >
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-foreground">Monthly Contributions</h3>
-            <div className="flex items-center space-x-2">
-              <div className="h-3 w-3 bg-primary rounded-full"></div>
-              <span className="text-sm text-muted-foreground">Contributions</span>
-            </div>
-          </div>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={monthlyContributions}>
-                <defs>
-                  <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#22C55E" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#22C55E" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                <XAxis dataKey="month" stroke="#6B7280" />
-                <YAxis stroke="#6B7280" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'white', 
-                    border: '1px solid #E5E7EB',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-                  }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="amount" 
-                  stroke="#22C55E" 
-                  strokeWidth={2}
-                  fillOpacity={1} 
-                  fill="url(#colorAmount)" 
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        {/* Loan Distribution */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.6 }}
-          className="card-elevated p-6"
-        >
-          <h3 className="text-lg font-semibold text-foreground mb-6">Loan Status Distribution</h3>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={loanDistribution}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {loanDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex justify-center space-x-6 mt-4">
-            {loanDistribution.map((item) => (
-              <div key={item.name} className="flex items-center space-x-2">
-                <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                <span className="text-sm text-muted-foreground">{item.name} ({item.value})</span>
+      {/* Charts Section - Only show to admins and members */}
+      {(currentRole === 'member' || isAdmin) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Monthly Contributions Trend */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.5 }}
+            className="card-elevated p-6"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-foreground">Monthly Contributions</h3>
+              <div className="flex items-center space-x-2">
+                <div className="h-3 w-3 bg-primary rounded-full"></div>
+                <span className="text-sm text-muted-foreground">Contributions</span>
               </div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
+            </div>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={monthlyContributions}>
+                  <defs>
+                    <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#22C55E" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#22C55E" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                  <XAxis dataKey="month" stroke="#6B7280" />
+                  <YAxis stroke="#6B7280" />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'white', 
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                    }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="amount" 
+                    stroke="#22C55E" 
+                    strokeWidth={2}
+                    fillOpacity={1} 
+                    fill="url(#colorAmount)" 
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+
+          {/* Loan Distribution - Only for admins */}
+          {isAdmin && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.6 }}
+              className="card-elevated p-6"
+            >
+              <h3 className="text-lg font-semibold text-foreground mb-6">Loan Status Distribution</h3>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={loanDistribution}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {loanDistribution.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex justify-center space-x-6 mt-4">
+                {loanDistribution.map((item) => (
+                  <div key={item.name} className="flex items-center space-x-2">
+                    <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                    <span className="text-sm text-muted-foreground">{item.name} ({item.value})</span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </div>
+      )}
 
       {/* Recent Activity */}
       <motion.div

@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/useAuth";
+import { RoleSwitcher } from './RoleSwitcher';
 
 interface HeaderProps {
   title: string;
@@ -46,6 +47,9 @@ export default function Header({ title, subtitle }: HeaderProps) {
           <Bell className="h-5 w-5" />
           <span className="absolute -top-1 -right-1 h-3 w-3 bg-destructive rounded-full text-xs"></span>
         </motion.button>
+
+        {/* Role Switcher */}
+        <RoleSwitcher />
 
         {/* Settings */}
         <motion.button
