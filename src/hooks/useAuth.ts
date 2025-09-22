@@ -60,7 +60,7 @@ export const useAuth = () => {
         .from('users')
         .select('*')
         .eq('auth_uid', authUid)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('Error fetching user profile:', error);

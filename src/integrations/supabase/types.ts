@@ -41,13 +41,6 @@ export type Database = {
             foreignKeyName: "audit_logs_actor_id_fkey"
             columns: ["actor_id"]
             isOneToOne: false
-            referencedRelation: "member_contribution_summary"
-            referencedColumns: ["member_id"]
-          },
-          {
-            foreignKeyName: "audit_logs_actor_id_fkey"
-            columns: ["actor_id"]
-            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
@@ -92,13 +85,6 @@ export type Database = {
             foreignKeyName: "contributions_member_id_fkey"
             columns: ["member_id"]
             isOneToOne: false
-            referencedRelation: "member_contribution_summary"
-            referencedColumns: ["member_id"]
-          },
-          {
-            foreignKeyName: "contributions_member_id_fkey"
-            columns: ["member_id"]
-            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
@@ -130,13 +116,6 @@ export type Database = {
           period?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "dividends_member_id_fkey"
-            columns: ["member_id"]
-            isOneToOne: false
-            referencedRelation: "member_contribution_summary"
-            referencedColumns: ["member_id"]
-          },
           {
             foreignKeyName: "dividends_member_id_fkey"
             columns: ["member_id"]
@@ -182,13 +161,6 @@ export type Database = {
             foreignKeyName: "expenses_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
-            referencedRelation: "member_contribution_summary"
-            referencedColumns: ["member_id"]
-          },
-          {
-            foreignKeyName: "expenses_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
@@ -223,13 +195,6 @@ export type Database = {
           status?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "fines_member_id_fkey"
-            columns: ["member_id"]
-            isOneToOne: false
-            referencedRelation: "member_contribution_summary"
-            referencedColumns: ["member_id"]
-          },
           {
             foreignKeyName: "fines_member_id_fkey"
             columns: ["member_id"]
@@ -274,13 +239,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "loans"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "loan_repayments_member_id_fkey"
-            columns: ["member_id"]
-            isOneToOne: false
-            referencedRelation: "member_contribution_summary"
-            referencedColumns: ["member_id"]
           },
           {
             foreignKeyName: "loan_repayments_member_id_fkey"
@@ -336,13 +294,6 @@ export type Database = {
             foreignKeyName: "loans_member_id_fkey"
             columns: ["member_id"]
             isOneToOne: false
-            referencedRelation: "member_contribution_summary"
-            referencedColumns: ["member_id"]
-          },
-          {
-            foreignKeyName: "loans_member_id_fkey"
-            columns: ["member_id"]
-            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
           },
@@ -380,13 +331,6 @@ export type Database = {
           status?: Database["public"]["Enums"]["message_status"]
         }
         Relationships: [
-          {
-            foreignKeyName: "messages_member_id_fkey"
-            columns: ["member_id"]
-            isOneToOne: false
-            referencedRelation: "member_contribution_summary"
-            referencedColumns: ["member_id"]
-          },
           {
             foreignKeyName: "messages_member_id_fkey"
             columns: ["member_id"]
@@ -510,22 +454,8 @@ export type Database = {
             foreignKeyName: "withdrawals_approved_by_fkey"
             columns: ["approved_by"]
             isOneToOne: false
-            referencedRelation: "member_contribution_summary"
-            referencedColumns: ["member_id"]
-          },
-          {
-            foreignKeyName: "withdrawals_approved_by_fkey"
-            columns: ["approved_by"]
-            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "withdrawals_member_id_fkey"
-            columns: ["member_id"]
-            isOneToOne: false
-            referencedRelation: "member_contribution_summary"
-            referencedColumns: ["member_id"]
           },
           {
             foreignKeyName: "withdrawals_member_id_fkey"
@@ -553,6 +483,16 @@ export type Database = {
       current_user_id: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_member_contribution_summary: {
+        Args: { target_member_id?: string }
+        Returns: {
+          contribution_count: number
+          full_name: string
+          last_contribution: string
+          member_id: string
+          total_contributed: number
+        }[]
       }
       is_admin: {
         Args: Record<PropertyKey, never>
