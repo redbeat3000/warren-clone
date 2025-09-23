@@ -51,12 +51,22 @@ export default function MainLayout() {
   // Check if current user has access to active section - allow all access when no auth
   const hasAccess = !authUser || (authUser?.role && ['chairperson', 'treasurer', 'secretary', 'member', 'viewer'].includes(authUser.role));
 
-  // If user doesn't have access to current section, redirect to dashboard
   useEffect(() => {
-    if (authUser && !hasAccess) {
-      setActiveSection('dashboard');
+    if (authUser) {
+      console.log('Auth user loaded:', authUser);
     }
-  }, [authUser, hasAccess]);
+
+    // Listen for navigation events from dashboard buttons
+    const handleNavigation = (event: CustomEvent) => {
+      setActiveSection(event.detail);
+    };
+
+    window.addEventListener('navigate-to-section', handleNavigation as EventListener);
+    
+    return () => {
+      window.removeEventListener('navigate-to-section', handleNavigation as EventListener);
+    };
+  }, [authUser]);
 
   const ActiveComponent = sectionComponents[activeSection as keyof typeof sectionComponents];
 

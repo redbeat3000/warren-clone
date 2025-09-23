@@ -6,7 +6,8 @@ import {
   CurrencyDollarIcon,
   ChartBarIcon,
   ArrowTrendingUpIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  CogIcon
 } from '@heroicons/react/24/outline';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { useSupabaseQuery, useSupabaseStats } from '@/hooks/useSupabaseQuery';
@@ -182,9 +183,11 @@ export default function DashboardOverview() {
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          className="btn-primary"
+          onClick={() => window.dispatchEvent(new CustomEvent('navigate-to-section', { detail: 'settings' }))}
+          className="btn-primary flex items-center gap-2"
         >
-          Quick Actions
+          <CogIcon className="h-4 w-4" />
+          Settings
         </motion.button>
       </motion.div>
 

@@ -10,8 +10,12 @@ import {
   ChartBarIcon,
   ChatBubbleLeftRightIcon,
   Cog6ToothIcon,
-  ClipboardDocumentListIcon
+  ClipboardDocumentListIcon,
+  ChevronUpIcon,
+  UserIcon,
+  ArrowRightStartOnRectangleIcon
 } from '@heroicons/react/24/outline';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
 
 interface SidebarProps {
@@ -39,6 +43,7 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
   const navigation = !authUser 
     ? allNavigation 
     : allNavigation.filter(item => authUser?.role && item.roles.includes(authUser.role));
+
   return (
     <motion.div 
       initial={{ x: -280 }}
@@ -99,26 +104,55 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
 
       {/* User Profile */}
       <div className="border-t border-sidebar-border p-4">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
-          className="flex items-center space-x-3"
-        >
-          <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground text-sm font-medium">
-              {authUser?.first_name?.charAt(0)?.toUpperCase() || 'U'}
-            </span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-sidebar-foreground truncate">
-              {authUser ? (authUser?.full_name || `${authUser?.first_name} ${authUser?.last_name}`) : 'Guest User'}
-            </p>
-            <p className="text-xs text-sidebar-foreground/70 truncate capitalize">
-              {authUser?.role || 'guest'}
-            </p>
-          </div>
-        </motion.div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <motion.button 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8 }}
+              className="flex items-center space-x-3 w-full p-2 rounded-lg hover:bg-sidebar-accent transition-colors"
+            >
+              <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
+                <span className="text-primary-foreground text-sm font-medium">
+                  {authUser?.first_name?.charAt(0)?.toUpperCase() || 'U'}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-sm font-medium text-sidebar-foreground truncate">
+                  {authUser ? (authUser?.full_name || `${authUser?.first_name} ${authUser?.last_name}`) : 'Guest User'}
+                </p>
+                <p className="text-xs text-sidebar-foreground/70 truncate capitalize">
+                  {authUser?.role || 'guest'}
+                </p>
+              </div>
+              <ChevronUpIcon className="h-4 w-4 text-sidebar-foreground/50" />
+            </motion.button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-56 mb-2" align="end" side="top">
+            <div className="flex flex-col space-y-1 p-2">
+              <p className="text-sm font-medium leading-none">
+                {authUser ? (authUser?.full_name || `${authUser?.first_name} ${authUser?.last_name}`) : 'Guest User'}
+              </p>
+              <p className="text-xs leading-none text-muted-foreground">
+                {authUser?.email || 'guest@example.com'}
+              </p>
+            </div>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => window.dispatchEvent(new CustomEvent('navigate-to-section', { detail: 'settings' }))}>
+              <UserIcon className="mr-2 h-4 w-4" />
+              <span>Account Settings</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              <Cog6ToothIcon className="mr-2 h-4 w-4" />
+              <span>Preferences</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive">
+              <ArrowRightStartOnRectangleIcon className="mr-2 h-4 w-4" />
+              <span>Sign Out</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </motion.div>
   );

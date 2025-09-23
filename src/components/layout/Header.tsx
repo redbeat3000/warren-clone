@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Bell, Settings, User, LogOut } from "lucide-react";
+import { Bell, Settings, User, LogOut, Check, Clock, AlertCircle } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { 
@@ -9,6 +9,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/hooks/useAuth";
 
 
@@ -23,6 +24,48 @@ export default function Header({ title, subtitle }: HeaderProps) {
   const handleSignOut = async () => {
     await signOut();
   };
+
+  const handleSettingsClick = () => {
+    window.dispatchEvent(new CustomEvent('navigate-to-section', { detail: 'settings' }));
+  };
+
+  // Sample notifications data
+  const notifications = [
+    {
+      id: 1,
+      type: 'contribution',
+      message: 'Alice Wanjiku made a contribution of KES 5,000',
+      time: '2 minutes ago',
+      read: false,
+      icon: Check
+    },
+    {
+      id: 2,
+      type: 'loan',
+      message: 'John Kamau requested a loan of KES 20,000',
+      time: '1 hour ago',
+      read: false,
+      icon: Clock
+    },
+    {
+      id: 3,
+      type: 'overdue',
+      message: 'Mary Njoki has an overdue loan payment',
+      time: '3 hours ago',
+      read: true,
+      icon: AlertCircle
+    },
+    {
+      id: 4,
+      type: 'contribution',
+      message: 'Peter Mwangi made a contribution of KES 3,000',
+      time: '1 day ago',
+      read: true,
+      icon: Check
+    }
+  ];
+
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
     <motion.header
@@ -39,19 +82,76 @@ export default function Header({ title, subtitle }: HeaderProps) {
       
       <div className="flex items-center space-x-4">
         {/* Notifications */}
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          className="relative p-2 text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <Bell className="h-5 w-5" />
-          <span className="absolute -top-1 -right-1 h-3 w-3 bg-destructive rounded-full text-xs"></span>
-        </motion.button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="relative p-2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-5 w-5 bg-destructive rounded-full text-xs text-destructive-foreground flex items-center justify-center">
+                  {unreadCount}
+                </span>
+              )}
+            </motion.button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 p-0" align="end">
+            <div className="p-4 border-b">
+              <h4 className="font-semibold">Notifications</h4>
+              <p className="text-sm text-muted-foreground">
+                You have {unreadCount} unread notifications
+              </p>
+            </div>
+            <div className="max-h-96 overflow-y-auto">
+              {notifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`p-4 border-b border-border last:border-0 hover:bg-muted/50 transition-colors ${
+                    !notification.read ? 'bg-muted/20' : ''
+                  }`}
+                >
+                  <div className="flex items-start space-x-3">
+                    <div className={`p-1 rounded-full ${
+                      notification.type === 'contribution' ? 'bg-success/20' :
+                      notification.type === 'loan' ? 'bg-primary/20' :
+                      'bg-destructive/20'
+                    }`}>
+                      <notification.icon className={`h-4 w-4 ${
+                        notification.type === 'contribution' ? 'text-success' :
+                        notification.type === 'loan' ? 'text-primary' :
+                        'text-destructive'
+                      }`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground">
+                        {notification.message}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {notification.time}
+                      </p>
+                    </div>
+                    {!notification.read && (
+                      <div className="h-2 w-2 bg-primary rounded-full"></div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="p-2 border-t">
+              <Button variant="ghost" className="w-full text-sm">
+                Mark all as read
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
 
         {/* Settings */}
         <motion.button
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
+          onClick={handleSettingsClick}
           className="p-2 text-muted-foreground hover:text-foreground transition-colors"
         >
           <Settings className="h-5 w-5" />
