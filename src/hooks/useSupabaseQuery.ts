@@ -41,11 +41,14 @@ export function useSupabaseStats() {
   const { data: loans } = useSupabaseQuery('loans', '*', []);
   const { data: contributions } = useSupabaseQuery('contributions', 'amount', []);
   
+  // Use sample data when database is empty
+  const hasData = users.length > 0 || loans.length > 0 || contributions.length > 0;
+  
   const stats = {
-    totalMembers: users.length,
-    activeLoans: loans.filter((loan: any) => loan.status === 'active').length,
-    totalContributions: contributions.reduce((sum: number, c: any) => sum + parseFloat(c.amount || 0), 0),
-    availableCash: 245000 // This would be calculated from contributions - loans - expenses
+    totalMembers: hasData ? users.length : 5,
+    activeLoans: hasData ? loans.filter((loan: any) => loan.status === 'active').length : 2,
+    totalContributions: hasData ? contributions.reduce((sum: number, c: any) => sum + parseFloat(c.amount || 0), 0) : 135000,
+    availableCash: hasData ? 245000 : 85000 // This would be calculated from contributions - loans - expenses
   };
 
   return stats;

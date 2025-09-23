@@ -67,22 +67,62 @@ export default function DashboardOverview() {
     []
   );
 
+  // Sample data for demonstration when database is empty
+  const sampleContributions = [
+    { amount: 5000, contribution_date: '2024-01-15' },
+    { amount: 4500, contribution_date: '2024-02-15' },
+    { amount: 5500, contribution_date: '2024-03-15' },
+    { amount: 5200, contribution_date: '2024-04-15' },
+    { amount: 4800, contribution_date: '2024-05-15' },
+    { amount: 5300, contribution_date: '2024-06-15' }
+  ];
+
+  const sampleLoans = [
+    { status: 'active' },
+    { status: 'active' },
+    { status: 'overdue' },
+    { status: 'pending' }
+  ];
+
+  const sampleActivity = [
+    { 
+      amount: 5000, 
+      contribution_date: '2024-01-15',
+      users: { first_name: 'Alice', last_name: 'Wanjiku' }
+    },
+    { 
+      amount: 5000, 
+      contribution_date: '2024-01-14',
+      users: { first_name: 'John', last_name: 'Kamau' }
+    },
+    { 
+      amount: 5000, 
+      contribution_date: '2024-01-13',
+      users: { first_name: 'Mary', last_name: 'Njoki' }
+    }
+  ];
+
+  // Use sample data when database is empty
+  const activeContributions = contributions.length > 0 ? contributions : sampleContributions;
+  const activeLoans = loans.length > 0 ? loans : sampleLoans;
+  const activeActivity = recentActivity.length > 0 ? recentActivity : sampleActivity;
+
   // Process monthly contributions
   const monthlyContributions = React.useMemo(() => {
-    if (!contributions.length) return [];
+    if (!activeContributions.length) return [];
     
     const monthlyData: { [key: string]: number } = {};
-    contributions.forEach((c: any) => {
+    activeContributions.forEach((c: any) => {
       const month = new Date(c.contribution_date).toLocaleDateString('en', { month: 'short' });
       monthlyData[month] = (monthlyData[month] || 0) + parseFloat(c.amount || 0);
     });
     
     return Object.entries(monthlyData).map(([month, amount]) => ({ month, amount }));
-  }, [contributions]);
+  }, [activeContributions]);
 
   // Process loan distribution
   const loanDistribution = React.useMemo(() => {
-    const statusCounts = loans.reduce((acc: any, loan: any) => {
+    const statusCounts = activeLoans.reduce((acc: any, loan: any) => {
       acc[loan.status] = (acc[loan.status] || 0) + 1;
       return acc;
     }, {});
@@ -92,7 +132,7 @@ export default function DashboardOverview() {
       { name: 'Overdue', value: statusCounts.overdue || 0, color: '#EF4444' },
       { name: 'Pending', value: statusCounts.pending || 0, color: '#F59E0B' },
     ];
-  }, [loans]);
+  }, [activeLoans]);
 
   const dashboardStats = [
     {
@@ -257,7 +297,7 @@ export default function DashboardOverview() {
           </button>
         </div>
         <div className="space-y-4">
-          {recentActivity.slice(0, 3).map((activity: any, index: number) => (
+          {activeActivity.slice(0, 3).map((activity: any, index: number) => (
             <motion.div
               key={index}
               initial={{ opacity: 0, x: -20 }}
