@@ -9,48 +9,12 @@ import LoansView from '../loans/LoansView';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/hooks/useAuth';
 
-// Placeholder components for other sections
-const FinesView = () => (
-  <div className="p-6">
-    <h2 className="text-2xl font-bold text-foreground mb-4">Fines</h2>
-    <p className="text-muted-foreground">Manage fines and penalties</p>
-  </div>
-);
-
-const ExpensesView = () => (
-  <div className="p-6">
-    <h2 className="text-2xl font-bold text-foreground mb-4">Expenses</h2>
-    <p className="text-muted-foreground">Track expenses and withdrawals</p>
-  </div>
-);
-
-const DividendsView = () => (
-  <div className="p-6">
-    <h2 className="text-2xl font-bold text-foreground mb-4">Dividends</h2>
-    <p className="text-muted-foreground">Calculate and distribute dividends</p>
-  </div>
-);
-
-const ReportsView = () => (
-  <div className="p-6">
-    <h2 className="text-2xl font-bold text-foreground mb-4">Reports</h2>
-    <p className="text-muted-foreground">Generate financial and member reports</p>
-  </div>
-);
-
-const MessagesView = () => (
-  <div className="p-6">
-    <h2 className="text-2xl font-bold text-foreground mb-4">Messages</h2>
-    <p className="text-muted-foreground">Send SMS, WhatsApp, and email notifications</p>
-  </div>
-);
-
-const SettingsView = () => (
-  <div className="p-6">
-    <h2 className="text-2xl font-bold text-foreground mb-4">Settings</h2>
-    <p className="text-muted-foreground">Configure system settings and preferences</p>
-  </div>
-);
+import FinesView from '../fines/FinesView';
+import ExpensesView from '../expenses/ExpensesView';
+import DividendsView from '../dividends/DividendsView';
+import ReportsView from '../reports/ReportsView';
+import MessagesView from '../messages/MessagesView';
+import SettingsView from '../settings/SettingsView';
 
 // Role-based component rendering
 const sectionComponents = {
