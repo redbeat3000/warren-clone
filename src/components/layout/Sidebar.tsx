@@ -35,10 +35,10 @@ const allNavigation = [
 export default function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
   const { authUser, isAdmin } = useAuth();
   
-  // Filter navigation based on user role
-  const navigation = allNavigation.filter(item => 
-    authUser?.role && item.roles.includes(authUser.role)
-  );
+  // Filter navigation based on user role - show all items when no auth
+  const navigation = !authUser 
+    ? allNavigation 
+    : allNavigation.filter(item => authUser?.role && item.roles.includes(authUser.role));
   return (
     <motion.div 
       initial={{ x: -280 }}
@@ -112,10 +112,10 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-sidebar-foreground truncate">
-              {authUser?.full_name || `${authUser?.first_name} ${authUser?.last_name}`}
+              {authUser ? (authUser?.full_name || `${authUser?.first_name} ${authUser?.last_name}`) : 'Guest User'}
             </p>
             <p className="text-xs text-sidebar-foreground/70 truncate capitalize">
-              {authUser?.role}
+              {authUser?.role || 'guest'}
             </p>
           </div>
         </motion.div>

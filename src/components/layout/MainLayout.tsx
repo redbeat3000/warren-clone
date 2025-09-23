@@ -84,8 +84,8 @@ export default function MainLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { authUser, isAdmin } = useAuth();
 
-  // Check if current user has access to active section
-  const hasAccess = authUser?.role && ['chairperson', 'treasurer', 'secretary', 'member', 'viewer'].includes(authUser.role);
+  // Check if current user has access to active section - allow all access when no auth
+  const hasAccess = !authUser || (authUser?.role && ['chairperson', 'treasurer', 'secretary', 'member', 'viewer'].includes(authUser.role));
 
   // If user doesn't have access to current section, redirect to dashboard
   useEffect(() => {
