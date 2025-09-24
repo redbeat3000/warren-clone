@@ -43,13 +43,11 @@ export default function AddMemberForm({ onSuccess, onClose }: AddMemberFormProps
 
   const onSubmit = async (data: MemberFormData) => {
     try {
-      const fullName = `${data.firstName} ${data.lastName}`;
       const { error } = await supabase
         .from('users')
         .insert({
           first_name: data.firstName,
           last_name: data.lastName,
-          full_name: fullName,
           email: data.email,
           phone: data.phone,
           national_id: data.nationalId || null,
