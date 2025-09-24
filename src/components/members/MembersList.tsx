@@ -12,6 +12,7 @@ import {
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import AddMemberForm from './AddMemberForm';
 import MemberDetailsDialog from './MemberDetailsDialog';
+import EditMemberDialog from './EditMemberDialog';
 import { supabase } from '@/integrations/supabase/client';
 
 // Sample member data
@@ -198,6 +199,8 @@ export default function MembersList() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [isMemberDetailsOpen, setIsMemberDetailsOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [isEditMemberOpen, setIsEditMemberOpen] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -262,8 +265,8 @@ export default function MembersList() {
   };
 
   const handleEditMember = (member: Member) => {
-    // TODO: Implement edit functionality
-    console.log('Edit member:', member);
+    setEditingMember(member);
+    setIsEditMemberOpen(true);
   };
 
   const activeMembers = members.length > 0 ? members : sampleMembers;
@@ -388,6 +391,16 @@ export default function MembersList() {
         member={selectedMember}
         open={isMemberDetailsOpen}
         onClose={() => setIsMemberDetailsOpen(false)}
+      />
+
+      <EditMemberDialog 
+        member={editingMember}
+        open={isEditMemberOpen}
+        onClose={() => setIsEditMemberOpen(false)}
+        onSuccess={() => {
+          fetchMembers();
+          setRefreshKey(prev => prev + 1);
+        }}
       />
     </div>
   );
