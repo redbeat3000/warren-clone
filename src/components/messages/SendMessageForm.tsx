@@ -73,6 +73,14 @@ export default function SendMessageForm({ onSuccess, onClose }: SendMessageFormP
   };
 
   const onSubmit = async (data: MessageFormData) => {
+    await handleFormSubmit(data, 'queued');
+  };
+
+  const onSaveDraft = async (data: MessageFormData) => {
+    await handleFormSubmit(data, 'draft');
+  };
+
+  const handleFormSubmit = async (data: MessageFormData, status: 'queued' | 'draft') => {
     try {
       // If sending to all members, get all member IDs
       const recipientIds = data.recipientType === 'all' 
@@ -93,7 +101,7 @@ export default function SendMessageForm({ onSuccess, onClose }: SendMessageFormP
         member_id: memberId,
         channel: data.channel as any,
         message_content: data.messageContent,
-        status: 'queued' as any,
+        status: status as any,
       }));
 
       const { error } = await supabase
@@ -104,7 +112,9 @@ export default function SendMessageForm({ onSuccess, onClose }: SendMessageFormP
 
       toast({
         title: 'Success',
-        description: `Message queued for ${recipientIds.length} recipient(s)`,
+        description: status === 'draft' 
+          ? `Draft saved for ${recipientIds.length} recipient(s)`
+          : `Message queued for ${recipientIds.length} recipient(s)`,
       });
 
       onSuccess();
@@ -112,7 +122,7 @@ export default function SendMessageForm({ onSuccess, onClose }: SendMessageFormP
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to send message',
+        description: error.message || `Failed to ${status === 'draft' ? 'save draft' : 'send message'}`,
         variant: 'destructive',
       });
     }
@@ -256,6 +266,14 @@ export default function SendMessageForm({ onSuccess, onClose }: SendMessageFormP
           <div className="flex justify-end space-x-2 pt-4">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
+            </Button>
+            <Button 
+              type="button" 
+              variant="secondary" 
+              onClick={form.handleSubmit(onSaveDraft)}
+              disabled={form.formState.isSubmitting}
+            >
+              {form.formState.isSubmitting ? 'Saving...' : 'Save Draft'}
             </Button>
             <Button type="submit" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting ? 'Sending...' : 'Send Message'}

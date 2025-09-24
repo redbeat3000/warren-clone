@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { TrashIcon } from '@heroicons/react/24/outline';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -77,6 +79,27 @@ export default function EditMemberDialog({ member, open, onClose, onSuccess }: E
     if (!member) return;
 
     try {
+      // Check if trying to change someone to chairperson when one already exists
+      if (data.role === 'chairperson' && member.role !== 'chairperson') {
+        const { data: existingChairperson, error: checkError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('role', 'chairperson')
+          .eq('status', 'active')
+          .limit(1);
+
+        if (checkError) throw checkError;
+
+        if (existingChairperson && existingChairperson.length > 0) {
+          toast({
+            title: "Error",
+            description: "Only one chairperson is allowed in the system",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
       const { error } = await supabase
         .from('users')
         .update({
@@ -102,6 +125,43 @@ export default function EditMemberDialog({ member, open, onClose, onSuccess }: E
       toast({
         title: "Error",
         description: error.message || "Failed to update member details",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteMember = async () => {
+    if (!member) return;
+
+    // Prevent deleting chairperson
+    if (member.role === 'chairperson') {
+      toast({
+        title: "System Error",
+        description: "The chairperson's account cannot be deleted for system security",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', member.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Member deleted successfully",
+      });
+      
+      onSuccess();
+      onClose();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete member",
         variant: "destructive",
       });
     }
@@ -227,13 +287,47 @@ export default function EditMemberDialog({ member, open, onClose, onSuccess }: E
                 )}
               />
 
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button type="button" variant="outline" onClick={onClose}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={form.formState.isSubmitting}>
-                  {form.formState.isSubmitting ? 'Saving...' : 'Save Changes'}
-                </Button>
+              <div className="flex justify-between items-center pt-4">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button 
+                      type="button" 
+                      variant="destructive" 
+                      size="sm"
+                      disabled={member?.role === 'chairperson'}
+                    >
+                      <TrashIcon className="h-4 w-4 mr-2" />
+                      Delete Member
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Member</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to delete {member?.firstName} {member?.lastName}? 
+                        This action cannot be undone and will remove all their data.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={handleDeleteMember}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+
+                <div className="flex space-x-2">
+                  <Button type="button" variant="outline" onClick={onClose}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={form.formState.isSubmitting}>
+                    {form.formState.isSubmitting ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                </div>
               </div>
             </form>
           </Form>
