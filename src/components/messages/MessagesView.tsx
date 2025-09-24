@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   PlusIcon,
@@ -10,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import SendMessageForm from './SendMessageForm';
+import { supabase } from '@/integrations/supabase/client';
 
 // Sample messages data
 const sampleMessages = [
@@ -41,12 +42,68 @@ export default function MessagesView() {
   const [activeTab, setActiveTab] = useState('messages');
   const [isNewMessageOpen, setIsNewMessageOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const totalSent = sampleMessages.filter(msg => msg.status === 'sent').length;
-  const totalDrafts = sampleMessages.filter(msg => msg.status === 'draft').length;
-  const totalRecipients = sampleMessages.reduce((sum, msg) => sum + msg.recipientCount, 0);
-  const averageDelivery = sampleMessages.length > 0 
-    ? Math.round(sampleMessages.reduce((sum, msg) => sum + msg.deliveryRate, 0) / sampleMessages.length)
+  useEffect(() => {
+    fetchMessages();
+    
+    // Set up real-time subscription
+    const channel = supabase
+      .channel('messages-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages'
+        },
+        () => {
+          fetchMessages();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchMessages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*, users!inner(first_name, last_name)')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedMessages = (data || []).map((message: any) => ({
+        id: message.id,
+        title: `Message to ${message.users.first_name}`,
+        type: message.channel.toUpperCase(),
+        recipients: `${message.users.first_name} ${message.users.last_name}`,
+        recipientCount: 1,
+        content: message.message_content,
+        sentDate: message.sent_at || message.created_at,
+        status: message.status,
+        deliveryRate: message.status === 'sent' ? 100 : 0
+      }));
+
+      setMessages(formattedMessages);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const activeMessages = messages.length > 0 ? messages : sampleMessages;
+  const totalSent = activeMessages.filter(msg => msg.status === 'sent').length;
+  const totalDrafts = activeMessages.filter(msg => msg.status === 'draft').length;
+  const totalRecipients = activeMessages.reduce((sum, msg) => sum + msg.recipientCount, 0);
+  const averageDelivery = activeMessages.length > 0 
+    ? Math.round(activeMessages.reduce((sum, msg) => sum + msg.deliveryRate, 0) / activeMessages.length)
     : 0;
 
   return (
@@ -187,7 +244,7 @@ export default function MessagesView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {sampleMessages.map((message, index) => (
+              {activeMessages.map((message, index) => (
                 <motion.tr
                   key={message.id}
                   initial={{ opacity: 0, x: -20 }}

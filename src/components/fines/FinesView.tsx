@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   PlusIcon,
@@ -9,6 +9,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import AddFineForm from './AddFineForm';
+import { supabase } from '@/integrations/supabase/client';
 
 // Sample fines data
 const sampleFines = [
@@ -51,13 +52,69 @@ export default function FinesView() {
   const [filter, setFilter] = useState('all');
   const [isAddFineOpen, setIsAddFineOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [fines, setFines] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const totalFines = sampleFines.reduce((sum, fine) => sum + fine.amount, 0);
-  const paidFines = sampleFines.filter(fine => fine.status === 'paid').length;
-  const pendingFines = sampleFines.filter(fine => fine.status === 'pending').length;
-  const overdueFines = sampleFines.filter(fine => fine.status === 'overdue').length;
+  useEffect(() => {
+    fetchFines();
+    
+    // Set up real-time subscription
+    const channel = supabase
+      .channel('fines-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'fines'
+        },
+        () => {
+          fetchFines();
+        }
+      )
+      .subscribe();
 
-  const filteredFines = sampleFines.filter(fine => 
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchFines = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('fines')
+        .select('*, users!inner(first_name, last_name, member_no)')
+        .order('fine_date', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedFines = (data || []).map((fine: any) => ({
+        id: fine.id,
+        fineNo: `FN${fine.id.slice(-3)}`,
+        memberName: `${fine.users.first_name} ${fine.users.last_name}`,
+        memberNo: fine.users.member_no || 'N/A',
+        reason: fine.reason,
+        amount: fine.amount,
+        dueDate: fine.fine_date,
+        status: fine.status,
+        dateIssued: fine.created_at
+      }));
+
+      setFines(formattedFines);
+    } catch (error) {
+      console.error('Error fetching fines:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const activeFines = fines.length > 0 ? fines : sampleFines;
+  const totalFines = activeFines.reduce((sum, fine) => sum + fine.amount, 0);
+  const paidFines = activeFines.filter(fine => fine.status === 'paid').length;
+  const pendingFines = activeFines.filter(fine => fine.status === 'pending').length;
+  const overdueFines = activeFines.filter(fine => fine.status === 'overdue').length;
+
+  const filteredFines = activeFines.filter(fine => 
     filter === 'all' || fine.status === filter
   );
 

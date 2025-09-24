@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   PlusIcon,
@@ -10,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import AddLoanForm from './AddLoanForm';
+import { supabase } from '@/integrations/supabase/client';
 
 // Sample loans data
 const sampleLoans = [
@@ -61,13 +62,72 @@ export default function LoansView() {
   const [filter, setFilter] = useState('all');
   const [isAddLoanOpen, setIsAddLoanOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [loans, setLoans] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const totalLoaned = sampleLoans.reduce((sum, loan) => sum + loan.principal, 0);
-  const totalOutstanding = sampleLoans.reduce((sum, loan) => sum + loan.balance, 0);
-  const activeLoans = sampleLoans.filter(loan => loan.status === 'active').length;
-  const overdueLoans = sampleLoans.filter(loan => loan.status === 'overdue').length;
+  useEffect(() => {
+    fetchLoans();
+    
+    // Set up real-time subscription
+    const channel = supabase
+      .channel('loans-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'loans'
+        },
+        () => {
+          fetchLoans();
+        }
+      )
+      .subscribe();
 
-  const filteredLoans = sampleLoans.filter(loan => 
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchLoans = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('loans')
+        .select('*, users!inner(first_name, last_name, member_no)')
+        .order('issue_date', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedLoans = (data || []).map((loan: any) => ({
+        id: loan.id,
+        loanNo: `LN${loan.id.slice(-3)}`,
+        memberName: `${loan.users.first_name} ${loan.users.last_name}`,
+        memberNo: loan.users.member_no || 'N/A',
+        principal: loan.principal,
+        interestRate: loan.interest_rate,
+        term: loan.term_months,
+        issueDate: loan.issue_date,
+        balance: loan.principal, // TODO: Calculate actual balance
+        monthlyPayment: Math.round(loan.principal / loan.term_months),
+        nextPayment: loan.due_date,
+        status: loan.status
+      }));
+
+      setLoans(formattedLoans);
+    } catch (error) {
+      console.error('Error fetching loans:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const activeLoans = loans.length > 0 ? loans : sampleLoans;
+  const totalLoaned = activeLoans.reduce((sum, loan) => sum + loan.principal, 0);
+  const totalOutstanding = activeLoans.reduce((sum, loan) => sum + loan.balance, 0);
+  const activeLoanCount = activeLoans.filter(loan => loan.status === 'active').length;
+  const overdueLoans = activeLoans.filter(loan => loan.status === 'overdue').length;
+
+  const filteredLoans = activeLoans.filter(loan => 
     filter === 'all' || loan.status === filter
   );
 
@@ -148,7 +208,7 @@ export default function LoansView() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Active Loans</p>
-              <p className="text-2xl font-bold text-foreground mt-2">{activeLoans}</p>
+              <p className="text-2xl font-bold text-foreground mt-2">{activeLoanCount}</p>
             </div>
             <div className="h-12 w-12 bg-success/10 rounded-lg flex items-center justify-center">
               <CalendarDaysIcon className="h-6 w-6 text-success" />

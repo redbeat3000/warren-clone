@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   PlusIcon,
@@ -10,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import AddContributionForm from './AddContributionForm';
+import { supabase } from '@/integrations/supabase/client';
 
 // Sample contributions data
 const sampleContributions = [
@@ -59,12 +60,67 @@ export default function ContributionsView() {
   const [filter, setFilter] = useState('all');
   const [isAddContributionOpen, setIsAddContributionOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [contributions, setContributions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const totalContributions = sampleContributions.reduce((sum, contrib) => sum + contrib.amount, 0);
+  useEffect(() => {
+    fetchContributions();
+    
+    // Set up real-time subscription
+    const channel = supabase
+      .channel('contributions-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'contributions'
+        },
+        () => {
+          fetchContributions();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchContributions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('contributions')
+        .select('*, users!inner(first_name, last_name, member_no)')
+        .order('contribution_date', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedContributions = (data || []).map((contrib: any) => ({
+        id: contrib.id,
+        receiptNo: contrib.receipt_no || `REC${contrib.id.slice(-3)}`,
+        memberName: `${contrib.users.first_name} ${contrib.users.last_name}`,
+        memberNo: contrib.users.member_no || 'N/A',
+        amount: contrib.amount,
+        date: contrib.contribution_date,
+        paymentMethod: contrib.payment_method || 'N/A',
+        status: 'confirmed'
+      }));
+
+      setContributions(formattedContributions);
+    } catch (error) {
+      console.error('Error fetching contributions:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const activeContributions = contributions.length > 0 ? contributions : sampleContributions;
+  const totalContributions = activeContributions.reduce((sum, contrib) => sum + contrib.amount, 0);
   const monthlyTarget = 50000;
   const targetProgress = (totalContributions / monthlyTarget) * 100;
 
-  const filteredContributions = sampleContributions.filter(contrib => 
+  const filteredContributions = activeContributions.filter(contrib => 
     filter === 'all' || contrib.status === filter
   );
 
@@ -147,8 +203,8 @@ export default function ContributionsView() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Contributors</p>
-              <p className="text-2xl font-bold text-foreground mt-2">{sampleContributions.length}</p>
-              <p className="text-sm text-success mt-2">4 members contributed</p>
+              <p className="text-2xl font-bold text-foreground mt-2">{activeContributions.length}</p>
+              <p className="text-sm text-success mt-2">{activeContributions.length} members contributed</p>
             </div>
             <div className="h-12 w-12 bg-success/10 rounded-lg flex items-center justify-center">
               <CalendarDaysIcon className="h-6 w-6 text-success" />
@@ -166,7 +222,7 @@ export default function ContributionsView() {
             <div>
               <p className="text-sm font-medium text-muted-foreground">Average</p>
               <p className="text-2xl font-bold text-foreground mt-2">
-                KES {Math.round(totalContributions / sampleContributions.length).toLocaleString()}
+                KES {activeContributions.length > 0 ? Math.round(totalContributions / activeContributions.length).toLocaleString() : '0'}
               </p>
               <p className="text-sm text-muted-foreground mt-2">Per contribution</p>
             </div>

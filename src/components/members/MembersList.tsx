@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   MagnifyingGlassIcon,
@@ -12,6 +12,7 @@ import {
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import AddMemberForm from './AddMemberForm';
 import MemberDetailsDialog from './MemberDetailsDialog';
+import { supabase } from '@/integrations/supabase/client';
 
 // Sample member data
 const sampleMembers = [
@@ -197,6 +198,63 @@ export default function MembersList() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [isMemberDetailsOpen, setIsMemberDetailsOpen] = useState(false);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchMembers();
+    
+    // Set up real-time subscription
+    const channel = supabase
+      .channel('members-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'users'
+        },
+        () => {
+          fetchMembers();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchMembers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('first_name');
+
+      if (error) throw error;
+
+      const formattedMembers: Member[] = (data || []).map((user: any) => ({
+        id: user.id,
+        memberNo: user.member_no || 'N/A',
+        firstName: user.first_name,
+        lastName: user.last_name,
+        phone: user.phone || 'N/A',
+        email: user.email || 'N/A',
+        joinDate: user.join_date || user.created_at,
+        status: user.status,
+        role: user.role,
+        totalContributions: 0, // Will be calculated from contributions table
+        activeLoans: 0 // Will be calculated from loans table
+      }));
+
+      setMembers(formattedMembers);
+    } catch (error) {
+      console.error('Error fetching members:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleViewMember = (member: Member) => {
     setSelectedMember(member);
@@ -208,7 +266,8 @@ export default function MembersList() {
     console.log('Edit member:', member);
   };
 
-  const filteredMembers = sampleMembers.filter(member => {
+  const activeMembers = members.length > 0 ? members : sampleMembers;
+  const filteredMembers = activeMembers.filter(member => {
     const matchesSearch = `${member.firstName} ${member.lastName} ${member.memberNo}`.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || member.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -283,20 +342,20 @@ export default function MembersList() {
         className="grid grid-cols-1 sm:grid-cols-4 gap-4"
       >
         <div className="bg-primary/10 rounded-lg p-4 border border-primary/20">
-          <p className="text-2xl font-bold text-primary">{sampleMembers.length}</p>
+          <p className="text-2xl font-bold text-primary">{activeMembers.length}</p>
           <p className="text-sm text-muted-foreground">Total Members</p>
         </div>
         <div className="bg-success/10 rounded-lg p-4 border border-success/20">
-          <p className="text-2xl font-bold text-success">{sampleMembers.filter(m => m.status === 'active').length}</p>
+          <p className="text-2xl font-bold text-success">{activeMembers.filter(m => m.status === 'active').length}</p>
           <p className="text-sm text-muted-foreground">Active Members</p>
         </div>
         <div className="bg-warning/10 rounded-lg p-4 border border-warning/20">
-          <p className="text-2xl font-bold text-warning">{sampleMembers.filter(m => m.activeLoans > 0).length}</p>
+          <p className="text-2xl font-bold text-warning">{activeMembers.filter(m => m.activeLoans > 0).length}</p>
           <p className="text-sm text-muted-foreground">With Loans</p>
         </div>
         <div className="bg-accent/10 rounded-lg p-4 border border-accent/20">
           <p className="text-2xl font-bold text-accent">
-            KES {sampleMembers.reduce((sum, m) => sum + m.totalContributions, 0).toLocaleString()}
+            KES {activeMembers.reduce((sum, m) => sum + m.totalContributions, 0).toLocaleString()}
           </p>
           <p className="text-sm text-muted-foreground">Total Contributions</p>
         </div>

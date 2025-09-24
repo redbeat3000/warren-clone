@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   PlusIcon,
@@ -10,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import AddExpenseForm from './AddExpenseForm';
+import { supabase } from '@/integrations/supabase/client';
 
 // Sample expenses data
 const sampleExpenses = [
@@ -73,21 +74,77 @@ export default function ExpensesView() {
   const [filter, setFilter] = useState('all');
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const totalExpenses = sampleExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-  const approvedExpenses = sampleExpenses.filter(expense => expense.status === 'approved').length;
-  const pendingExpenses = sampleExpenses.filter(expense => expense.status === 'pending').length;
-  const thisMonthExpenses = sampleExpenses.filter(expense => 
+  useEffect(() => {
+    fetchExpenses();
+    
+    // Set up real-time subscription
+    const channel = supabase
+      .channel('expenses-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'expenses'
+        },
+        () => {
+          fetchExpenses();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchExpenses = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('expenses')
+        .select('*')
+        .order('expense_date', { ascending: false });
+
+      if (error) throw error;
+
+      const formattedExpenses = (data || []).map((expense: any) => ({
+        id: expense.id,
+        expenseNo: `EXP${expense.id.slice(-3)}`,
+        category: expense.category,
+        description: expense.description,
+        amount: expense.amount,
+        date: expense.expense_date,
+        approvedBy: 'System', // TODO: Add approved_by field
+        status: 'approved',
+        receiptUrl: expense.receipt_url
+      }));
+
+      setExpenses(formattedExpenses);
+    } catch (error) {
+      console.error('Error fetching expenses:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const activeExpenses = expenses.length > 0 ? expenses : sampleExpenses;
+  const totalExpenses = activeExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+  const approvedExpenses = activeExpenses.filter(expense => expense.status === 'approved').length;
+  const pendingExpenses = activeExpenses.filter(expense => expense.status === 'pending').length;
+  const thisMonthExpenses = activeExpenses.filter(expense => 
     new Date(expense.date).getMonth() === new Date().getMonth()
   ).reduce((sum, expense) => sum + expense.amount, 0);
 
-  const filteredExpenses = sampleExpenses.filter(expense => 
+  const filteredExpenses = activeExpenses.filter(expense => 
     filter === 'all' || expense.status === filter
   );
 
   // Group expenses by category
   const expensesByCategory = categories.map(category => {
-    const categoryExpenses = sampleExpenses.filter(exp => exp.category === category);
+    const categoryExpenses = activeExpenses.filter(exp => exp.category === category);
     const total = categoryExpenses.reduce((sum, exp) => sum + exp.amount, 0);
     return { category, total, count: categoryExpenses.length };
   }).filter(item => item.total > 0);
