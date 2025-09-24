@@ -146,11 +146,6 @@ export function SendMessageForm({ onSuccess }: SendMessageFormProps) {
                     id="select-all"
                     checked={allSelected}
                     onCheckedChange={toggleAllMembers}
-                    ref={(ref) => {
-                      if (ref) {
-                        ref.indeterminate = someSelected && !allSelected;
-                      }
-                    }}
                   />
                   <label htmlFor="select-all" className="text-sm font-medium">
                     Select All Members ({members.length})

@@ -49,14 +49,22 @@ export function AddMemberForm({ onSuccess }: AddMemberFormProps) {
 
   const onSubmit = async (data: MemberFormData) => {
     try {
+      const insertData = {
+        first_name: data.first_name,
+        last_name: data.last_name,
+        email: data.email || null,
+        phone: data.phone,
+        national_id: data.national_id,
+        member_no: data.member_no,
+        join_date: data.join_date.toISOString().split('T')[0],
+        role: data.role,
+        full_name: `${data.first_name} ${data.last_name}`,
+        status: 'active' as const
+      };
+      
       const { error } = await supabase
         .from('users')
-        .insert([{
-          ...data,
-          join_date: data.join_date.toISOString().split('T')[0],
-          full_name: `${data.first_name} ${data.last_name}`,
-          status: 'active' as const
-        }]);
+        .insert([insertData]);
 
       if (error) throw error;
 

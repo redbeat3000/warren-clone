@@ -48,12 +48,18 @@ export function AddContributionForm({ onSuccess }: AddContributionFormProps) {
 
   const onSubmit = async (data: ContributionFormData) => {
     try {
+      const insertData = {
+        member_id: data.member_id,
+        amount: data.amount,
+        contribution_date: data.contribution_date.toISOString().split('T')[0],
+        payment_method: data.payment_method || null,
+        receipt_no: data.receipt_no || null,
+        notes: data.notes || null
+      };
+      
       const { error } = await supabase
         .from('contributions')
-        .insert([{
-          ...data,
-          contribution_date: data.contribution_date.toISOString().split('T')[0]
-        }]);
+        .insert([insertData]);
 
       if (error) throw error;
 

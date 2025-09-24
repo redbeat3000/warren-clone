@@ -44,12 +44,17 @@ export function AddExpenseForm({ onSuccess }: AddExpenseFormProps) {
 
   const onSubmit = async (data: ExpenseFormData) => {
     try {
+      const insertData = {
+        category: data.category,
+        amount: data.amount,
+        description: data.description,
+        expense_date: data.expense_date.toISOString().split('T')[0],
+        receipt_url: data.receipt_url || null
+      };
+      
       const { error } = await supabase
         .from('expenses')
-        .insert([{
-          ...data,
-          expense_date: data.expense_date.toISOString().split('T')[0]
-        }]);
+        .insert([insertData]);
 
       if (error) throw error;
 

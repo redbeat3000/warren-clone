@@ -44,13 +44,17 @@ export function AddFineForm({ onSuccess }: AddFineFormProps) {
 
   const onSubmit = async (data: FineFormData) => {
     try {
+      const insertData = {
+        member_id: data.member_id,
+        amount: data.amount,
+        reason: data.reason,
+        fine_date: data.fine_date.toISOString().split('T')[0],
+        status: 'unpaid'
+      };
+      
       const { error } = await supabase
         .from('fines')
-        .insert([{
-          ...data,
-          fine_date: data.fine_date.toISOString().split('T')[0],
-          status: 'unpaid'
-        }]);
+        .insert([insertData]);
 
       if (error) throw error;
 

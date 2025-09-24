@@ -57,14 +57,21 @@ export function AddLoanForm({ onSuccess }: AddLoanFormProps) {
     try {
       const due_date = addMonths(data.issue_date, data.term_months);
       
+      const insertData = {
+        member_id: data.member_id,
+        principal: data.principal,
+        interest_rate: data.interest_rate,
+        term_months: data.term_months,
+        issue_date: data.issue_date.toISOString().split('T')[0],
+        due_date: due_date.toISOString().split('T')[0],
+        interest_type: data.interest_type,
+        notes: data.notes || null,
+        status: 'active' as const
+      };
+      
       const { error } = await supabase
         .from('loans')
-        .insert([{
-          ...data,
-          issue_date: data.issue_date.toISOString().split('T')[0],
-          due_date: due_date.toISOString().split('T')[0],
-          status: 'active' as const
-        }]);
+        .insert([insertData]);
 
       if (error) throw error;
 
