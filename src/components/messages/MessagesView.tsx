@@ -8,6 +8,8 @@ import {
   EyeIcon,
   PaperAirplaneIcon
 } from '@heroicons/react/24/outline';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import SendMessageForm from './SendMessageForm';
 
 // Sample messages data
 const sampleMessages = [
@@ -37,6 +39,8 @@ const sampleMessages = [
 
 export default function MessagesView() {
   const [activeTab, setActiveTab] = useState('messages');
+  const [isNewMessageOpen, setIsNewMessageOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const totalSent = sampleMessages.filter(msg => msg.status === 'sent').length;
   const totalDrafts = sampleMessages.filter(msg => msg.status === 'draft').length;
@@ -57,14 +61,24 @@ export default function MessagesView() {
           <h1 className="text-3xl font-bold text-foreground">Messages & Notifications</h1>
           <p className="text-muted-foreground mt-1">Send SMS, WhatsApp, and email communications to members</p>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="btn-primary flex items-center space-x-2"
-        >
-          <PlusIcon className="h-5 w-5" />
-          <span>New Message</span>
-        </motion.button>
+        <Dialog open={isNewMessageOpen} onOpenChange={setIsNewMessageOpen}>
+          <DialogTrigger asChild>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="btn-primary flex items-center space-x-2"
+            >
+              <PlusIcon className="h-5 w-5" />
+              <span>New Message</span>
+            </motion.button>
+          </DialogTrigger>
+          <DialogContent className="max-w-lg">
+            <SendMessageForm 
+              onSuccess={() => setRefreshKey(prev => prev + 1)} 
+              onClose={() => setIsNewMessageOpen(false)} 
+            />
+          </DialogContent>
+        </Dialog>
       </motion.div>
 
       {/* Stats Cards */}

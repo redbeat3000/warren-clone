@@ -8,6 +8,8 @@ import {
   EyeIcon,
   CurrencyDollarIcon
 } from '@heroicons/react/24/outline';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import AddLoanForm from './AddLoanForm';
 
 // Sample loans data
 const sampleLoans = [
@@ -57,6 +59,8 @@ const sampleLoans = [
 
 export default function LoansView() {
   const [filter, setFilter] = useState('all');
+  const [isAddLoanOpen, setIsAddLoanOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const totalLoaned = sampleLoans.reduce((sum, loan) => sum + loan.principal, 0);
   const totalOutstanding = sampleLoans.reduce((sum, loan) => sum + loan.balance, 0);
@@ -79,14 +83,24 @@ export default function LoansView() {
           <h1 className="text-3xl font-bold text-foreground">Loans</h1>
           <p className="text-muted-foreground mt-1">Manage loans, track repayments, and monitor schedules</p>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="btn-primary flex items-center space-x-2"
-        >
-          <PlusIcon className="h-5 w-5" />
-          <span>Issue Loan</span>
-        </motion.button>
+        <Dialog open={isAddLoanOpen} onOpenChange={setIsAddLoanOpen}>
+          <DialogTrigger asChild>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="btn-primary flex items-center space-x-2"
+            >
+              <PlusIcon className="h-5 w-5" />
+              <span>Issue Loan</span>
+            </motion.button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <AddLoanForm 
+              onSuccess={() => setRefreshKey(prev => prev + 1)} 
+              onClose={() => setIsAddLoanOpen(false)} 
+            />
+          </DialogContent>
+        </Dialog>
       </motion.div>
 
       {/* Summary Cards */}

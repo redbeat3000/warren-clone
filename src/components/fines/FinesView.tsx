@@ -7,6 +7,8 @@ import {
   CurrencyDollarIcon,
   EyeIcon
 } from '@heroicons/react/24/outline';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import AddFineForm from './AddFineForm';
 
 // Sample fines data
 const sampleFines = [
@@ -47,6 +49,8 @@ const sampleFines = [
 
 export default function FinesView() {
   const [filter, setFilter] = useState('all');
+  const [isAddFineOpen, setIsAddFineOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const totalFines = sampleFines.reduce((sum, fine) => sum + fine.amount, 0);
   const paidFines = sampleFines.filter(fine => fine.status === 'paid').length;
@@ -69,14 +73,24 @@ export default function FinesView() {
           <h1 className="text-3xl font-bold text-foreground">Fines & Penalties</h1>
           <p className="text-muted-foreground mt-1">Manage member fines and penalty tracking</p>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="btn-primary flex items-center space-x-2"
-        >
-          <PlusIcon className="h-5 w-5" />
-          <span>Issue Fine</span>
-        </motion.button>
+        <Dialog open={isAddFineOpen} onOpenChange={setIsAddFineOpen}>
+          <DialogTrigger asChild>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="btn-primary flex items-center space-x-2"
+            >
+              <PlusIcon className="h-5 w-5" />
+              <span>Issue Fine</span>
+            </motion.button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <AddFineForm 
+              onSuccess={() => setRefreshKey(prev => prev + 1)} 
+              onClose={() => setIsAddFineOpen(false)} 
+            />
+          </DialogContent>
+        </Dialog>
       </motion.div>
 
       {/* Summary Cards */}

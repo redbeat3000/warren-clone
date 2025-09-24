@@ -9,6 +9,9 @@ import {
   EyeIcon,
   PencilIcon
 } from '@heroicons/react/24/outline';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import AddMemberForm from './AddMemberForm';
+import MemberDetailsDialog from './MemberDetailsDialog';
 
 // Sample member data
 const sampleMembers = [
@@ -96,9 +99,11 @@ interface Member {
 interface MemberCardProps {
   member: Member;
   index: number;
+  onViewMember: (member: Member) => void;
+  onEditMember: (member: Member) => void;
 }
 
-function MemberCard({ member, index }: MemberCardProps) {
+function MemberCard({ member, index, onViewMember, onEditMember }: MemberCardProps) {
   const statusColors = {
     active: 'status-active',
     inactive: 'status-inactive',
@@ -143,6 +148,7 @@ function MemberCard({ member, index }: MemberCardProps) {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
+            onClick={() => onViewMember(member)}
             className="p-2 hover:bg-secondary rounded-lg transition-colors"
           >
             <EyeIcon className="h-4 w-4 text-muted-foreground" />
@@ -150,6 +156,7 @@ function MemberCard({ member, index }: MemberCardProps) {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
+            onClick={() => onEditMember(member)}
             className="p-2 hover:bg-secondary rounded-lg transition-colors"
           >
             <PencilIcon className="h-4 w-4 text-muted-foreground" />
@@ -186,6 +193,20 @@ function MemberCard({ member, index }: MemberCardProps) {
 export default function MembersList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [isMemberDetailsOpen, setIsMemberDetailsOpen] = useState(false);
+
+  const handleViewMember = (member: Member) => {
+    setSelectedMember(member);
+    setIsMemberDetailsOpen(true);
+  };
+
+  const handleEditMember = (member: Member) => {
+    // TODO: Implement edit functionality
+    console.log('Edit member:', member);
+  };
 
   const filteredMembers = sampleMembers.filter(member => {
     const matchesSearch = `${member.firstName} ${member.lastName} ${member.memberNo}`.toLowerCase().includes(searchTerm.toLowerCase());
@@ -205,14 +226,24 @@ export default function MembersList() {
           <h1 className="text-3xl font-bold text-foreground">Members</h1>
           <p className="text-muted-foreground mt-1">Manage your Chama members and their information</p>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="btn-primary flex items-center space-x-2"
-        >
-          <PlusIcon className="h-5 w-5" />
-          <span>Add Member</span>
-        </motion.button>
+        <Dialog open={isAddMemberOpen} onOpenChange={setIsAddMemberOpen}>
+          <DialogTrigger asChild>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="btn-primary flex items-center space-x-2"
+            >
+              <PlusIcon className="h-5 w-5" />
+              <span>Add Member</span>
+            </motion.button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <AddMemberForm 
+              onSuccess={() => setRefreshKey(prev => prev + 1)} 
+              onClose={() => setIsAddMemberOpen(false)} 
+            />
+          </DialogContent>
+        </Dialog>
       </motion.div>
 
       {/* Filters */}
@@ -274,7 +305,13 @@ export default function MembersList() {
       {/* Members Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {filteredMembers.map((member, index) => (
-          <MemberCard key={member.id} member={member} index={index} />
+          <MemberCard 
+            key={member.id} 
+            member={member} 
+            index={index}
+            onViewMember={handleViewMember}
+            onEditMember={handleEditMember}
+          />
         ))}
       </div>
 
@@ -287,6 +324,12 @@ export default function MembersList() {
           <p className="text-muted-foreground">No members found matching your criteria.</p>
         </motion.div>
       )}
+
+      <MemberDetailsDialog 
+        member={selectedMember}
+        open={isMemberDetailsOpen}
+        onClose={() => setIsMemberDetailsOpen(false)}
+      />
     </div>
   );
 }

@@ -8,6 +8,8 @@ import {
   EyeIcon,
   DocumentTextIcon
 } from '@heroicons/react/24/outline';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import AddExpenseForm from './AddExpenseForm';
 
 // Sample expenses data
 const sampleExpenses = [
@@ -69,6 +71,8 @@ const categories = [
 
 export default function ExpensesView() {
   const [filter, setFilter] = useState('all');
+  const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const totalExpenses = sampleExpenses.reduce((sum, expense) => sum + expense.amount, 0);
   const approvedExpenses = sampleExpenses.filter(expense => expense.status === 'approved').length;
@@ -100,14 +104,24 @@ export default function ExpensesView() {
           <h1 className="text-3xl font-bold text-foreground">Expenses</h1>
           <p className="text-muted-foreground mt-1">Track and manage Chama operational expenses</p>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="btn-primary flex items-center space-x-2"
-        >
-          <PlusIcon className="h-5 w-5" />
-          <span>Record Expense</span>
-        </motion.button>
+        <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
+          <DialogTrigger asChild>
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="btn-primary flex items-center space-x-2"
+            >
+              <PlusIcon className="h-5 w-5" />
+              <span>Record Expense</span>
+            </motion.button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <AddExpenseForm 
+              onSuccess={() => setRefreshKey(prev => prev + 1)} 
+              onClose={() => setIsAddExpenseOpen(false)} 
+            />
+          </DialogContent>
+        </Dialog>
       </motion.div>
 
       {/* Summary Cards */}

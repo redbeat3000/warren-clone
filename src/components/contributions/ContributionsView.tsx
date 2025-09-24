@@ -8,6 +8,8 @@ import {
   EyeIcon,
   PrinterIcon
 } from '@heroicons/react/24/outline';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import AddContributionForm from './AddContributionForm';
 
 // Sample contributions data
 const sampleContributions = [
@@ -55,6 +57,8 @@ const sampleContributions = [
 
 export default function ContributionsView() {
   const [filter, setFilter] = useState('all');
+  const [isAddContributionOpen, setIsAddContributionOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const totalContributions = sampleContributions.reduce((sum, contrib) => sum + contrib.amount, 0);
   const monthlyTarget = 50000;
@@ -85,14 +89,24 @@ export default function ContributionsView() {
             <DocumentArrowDownIcon className="h-5 w-5" />
             <span>Import CSV</span>
           </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="btn-primary flex items-center space-x-2"
-          >
-            <PlusIcon className="h-5 w-5" />
-            <span>Record Contribution</span>
-          </motion.button>
+          <Dialog open={isAddContributionOpen} onOpenChange={setIsAddContributionOpen}>
+            <DialogTrigger asChild>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="btn-primary flex items-center space-x-2"
+              >
+                <PlusIcon className="h-5 w-5" />
+                <span>Record Contribution</span>
+              </motion.button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <AddContributionForm 
+                onSuccess={() => setRefreshKey(prev => prev + 1)} 
+                onClose={() => setIsAddContributionOpen(false)} 
+              />
+            </DialogContent>
+          </Dialog>
         </div>
       </motion.div>
 
