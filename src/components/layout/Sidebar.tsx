@@ -17,6 +17,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
+import AccountSettingsDialog from '@/components/dialogs/AccountSettingsDialog';
+import PreferencesDialog from '@/components/dialogs/PreferencesDialog';
 
 interface SidebarProps {
   activeSection: string;
@@ -37,7 +39,9 @@ const allNavigation = [
 ];
 
 export default function Sidebar({ activeSection, onSectionChange }: SidebarProps) {
-  const { authUser, isAdmin } = useAuth();
+  const { authUser, isAdmin, signOut } = useAuth();
+  const [isAccountSettingsOpen, setIsAccountSettingsOpen] = React.useState(false);
+  const [isPreferencesOpen, setIsPreferencesOpen] = React.useState(false);
   
   // Filter navigation based on user role - show all items when no auth
   const navigation = !authUser 
@@ -138,22 +142,32 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
               </p>
             </div>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => window.dispatchEvent(new CustomEvent('navigate-to-section', { detail: 'settings' }))}>
+            <DropdownMenuItem onClick={() => setIsAccountSettingsOpen(true)}>
               <UserIcon className="mr-2 h-4 w-4" />
               <span>Account Settings</span>
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setIsPreferencesOpen(true)}>
               <Cog6ToothIcon className="mr-2 h-4 w-4" />
               <span>Preferences</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">
+            <DropdownMenuItem className="text-destructive" onClick={signOut}>
               <ArrowRightStartOnRectangleIcon className="mr-2 h-4 w-4" />
               <span>Sign Out</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* Dialogs */}
+      <AccountSettingsDialog 
+        open={isAccountSettingsOpen} 
+        onClose={() => setIsAccountSettingsOpen(false)} 
+      />
+      <PreferencesDialog 
+        open={isPreferencesOpen} 
+        onClose={() => setIsPreferencesOpen(false)} 
+      />
     </motion.div>
   );
 }
