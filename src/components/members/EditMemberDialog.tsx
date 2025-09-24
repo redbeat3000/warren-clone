@@ -48,6 +48,8 @@ type MemberFormData = z.infer<typeof memberSchema>;
 
 export default function EditMemberDialog({ member, open, onClose, onSuccess }: EditMemberDialogProps) {
   const { toast } = useToast();
+  const [isErrorDialogOpen, setIsErrorDialogOpen] = React.useState(false);
+  const [errorMessage, setErrorMessage] = React.useState('');
   
   const form = useForm<MemberFormData>({
     resolver: zodResolver(memberSchema),
@@ -91,11 +93,8 @@ export default function EditMemberDialog({ member, open, onClose, onSuccess }: E
         if (checkError) throw checkError;
 
         if (existingChairperson && existingChairperson.length > 0) {
-          toast({
-            title: "Error",
-            description: "Only one chairperson is allowed in the system",
-            variant: "destructive",
-          });
+          setErrorMessage("SYSTEM ERROR: Only one chairperson is allowed in the system. There is already an active chairperson.");
+          setIsErrorDialogOpen(true);
           return;
         }
       }
@@ -135,11 +134,8 @@ export default function EditMemberDialog({ member, open, onClose, onSuccess }: E
 
     // Prevent deleting chairperson
     if (member.role === 'chairperson') {
-      toast({
-        title: "System Error",
-        description: "The chairperson's account cannot be deleted for system security",
-        variant: "destructive",
-      });
+      setErrorMessage("SYSTEM ERROR: The chairperson's account cannot be deleted for system security reasons. This action is permanently blocked.");
+      setIsErrorDialogOpen(true);
       return;
     }
 
@@ -333,6 +329,26 @@ export default function EditMemberDialog({ member, open, onClose, onSuccess }: E
           </Form>
         </motion.div>
       </DialogContent>
+
+      {/* Error Dialog */}
+      <AlertDialog open={isErrorDialogOpen} onOpenChange={setIsErrorDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">System Security Error</AlertDialogTitle>
+            <AlertDialogDescription className="text-foreground">
+              {errorMessage}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction 
+              onClick={() => setIsErrorDialogOpen(false)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Understood
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
