@@ -18,6 +18,7 @@ import SettingsView from '../settings/SettingsView';
 import MeetingsView from '../meetings/MeetingsView';
 import DocumentsView from '../documents/DocumentsView';
 import AuditLogsView from '../audit/AuditLogsView';
+import NotificationsView from '../notifications/NotificationsView';
 
 // Role-based component rendering
 const sectionComponents = {
@@ -32,6 +33,7 @@ const sectionComponents = {
   documents: DocumentsView,
   reports: ReportsView,
   messages: MessagesView,
+  notifications: NotificationsView,
   audit: AuditLogsView,
   settings: SettingsView,
 };
@@ -47,7 +49,8 @@ const sectionTitles = {
   meetings: 'Meetings & Events',
   documents: 'Document Management',
   reports: 'Reports & Analytics',
-  messages: 'Messages & Notifications',
+  messages: 'Messages',
+  notifications: 'Notifications & Automation',
   audit: 'Audit Trail',
   settings: 'Settings',
 };

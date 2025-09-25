@@ -16,7 +16,8 @@ import {
   ArrowRightStartOnRectangleIcon,
   CalendarDaysIcon,
   DocumentTextIcon,
-  ShieldCheckIcon
+  ShieldCheckIcon,
+  BellIcon
 } from '@heroicons/react/24/outline';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
@@ -40,6 +41,7 @@ const allNavigation = [
   { name: 'Documents', id: 'documents', icon: DocumentTextIcon, roles: ['chairperson', 'treasurer', 'secretary'] },
   { name: 'Reports', id: 'reports', icon: ClipboardDocumentListIcon, roles: ['chairperson', 'treasurer', 'secretary'] },
   { name: 'Messages', id: 'messages', icon: ChatBubbleLeftRightIcon, roles: ['chairperson', 'secretary'] },
+  { name: 'Notifications', id: 'notifications', icon: BellIcon, roles: ['chairperson', 'treasurer', 'secretary'] },
   { name: 'Audit Logs', id: 'audit', icon: ShieldCheckIcon, roles: ['chairperson'] },
   { name: 'Settings', id: 'settings', icon: Cog6ToothIcon, roles: ['chairperson'] },
 ];

@@ -8,6 +8,10 @@ import {
   EyeIcon,
   PrinterIcon
 } from '@heroicons/react/24/outline';
+import { useFinancialData } from '@/hooks/useFinancialData';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 // Sample reports data
 const availableReports = [
@@ -77,10 +81,43 @@ const reportCategories = ['All', 'Financial', 'Members', 'Loans', 'Dividends', '
 
 export default function ReportsView() {
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const { summary, loading, exportToCSV, generateReport } = useFinancialData();
 
   const filteredReports = availableReports.filter(report => 
     selectedCategory === 'All' || report.category === selectedCategory
   );
+
+  const handleGenerateReport = async (reportType: string) => {
+    if (!summary) return;
+
+    switch (reportType) {
+      case 'financial-summary':
+        const financialData = [
+          { metric: 'Total Contributions', amount: summary.totalContributions },
+          { metric: 'Total Loans', amount: summary.totalLoans },
+          { metric: 'Total Expenses', amount: summary.totalExpenses },
+          { metric: 'Available Cash', amount: summary.availableCash }
+        ];
+        exportToCSV(financialData, 'financial-summary');
+        break;
+      
+      case 'member-balances':
+        exportToCSV(summary.memberBalances, 'member-balances');
+        break;
+        
+      case 'contributions-summary':
+        const contributionSummary = summary.memberBalances.map(member => ({
+          memberNo: member.memberNo,
+          memberName: member.memberName,
+          totalContributions: member.totalContributions
+        }));
+        exportToCSV(contributionSummary, 'contributions-summary');
+        break;
+        
+      default:
+        console.log('Generating report:', reportType);
+    }
+  };
 
   const recentReports = availableReports
     .sort((a, b) => new Date(b.lastGenerated).getTime() - new Date(a.lastGenerated).getTime())
@@ -107,6 +144,64 @@ export default function ReportsView() {
           <span>Custom Report</span>
         </motion.button>
       </motion.div>
+
+      {/* Live Financial Data */}
+      {summary && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="card-elevated p-6"
+        >
+          <h3 className="text-lg font-semibold text-foreground mb-4">Live Financial Summary</h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Total Contributions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-green-600">KES {summary.totalContributions.toLocaleString()}</p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Active Loans</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-blue-600">KES {summary.totalLoans.toLocaleString()}</p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Total Expenses</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-red-600">KES {summary.totalExpenses.toLocaleString()}</p>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Available Cash</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold text-primary">KES {summary.availableCash.toLocaleString()}</p>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <div className="flex justify-end space-x-2 mt-4">
+            <Button onClick={() => handleGenerateReport('financial-summary')} variant="outline">
+              Export Financial Summary
+            </Button>
+            <Button onClick={() => handleGenerateReport('member-balances')}>
+              Export Member Balances
+            </Button>
+          </div>
+        </motion.div>
+      )}
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -291,6 +386,7 @@ export default function ReportsView() {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="btn-primary flex-1 text-sm"
+                onClick={() => handleGenerateReport(report.id)}
               >
                 Generate
               </motion.button>
