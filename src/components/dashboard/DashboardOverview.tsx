@@ -13,6 +13,7 @@ import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
 import { useSupabaseQuery, useSupabaseStats } from '@/hooks/useSupabaseQuery';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 
 
@@ -55,6 +56,7 @@ function StatCard({ stat, index }: StatCardProps) {
 export default function DashboardOverview() {
   const stats = useSupabaseStats();
   const { authUser, isAdmin } = useAuth();
+  const [showAllActivity, setShowAllActivity] = useState(false);
   
   const { data: contributions, loading: contributionsLoading } = useSupabaseQuery(
     'contributions', 
@@ -295,9 +297,45 @@ export default function DashboardOverview() {
       >
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-semibold text-foreground">Recent Activity</h3>
-          <button className="text-primary hover:text-primary-hover text-sm font-medium">
-            View All
-          </button>
+          <Dialog open={showAllActivity} onOpenChange={setShowAllActivity}>
+            <DialogTrigger asChild>
+              <button className="text-primary hover:text-primary-hover text-sm font-medium">
+                View All
+              </button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>All Recent Activity</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 mt-4">
+                {activeActivity.map((activity: any, index: number) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="flex items-center justify-between py-3 border-b border-border last:border-0"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="h-2 w-2 rounded-full bg-success"></div>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          {activity.users?.first_name} {activity.users?.last_name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Contribution</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-foreground">KES {parseFloat(activity.amount || 0).toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(activity.contribution_date).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
         <div className="space-y-4">
           {activeActivity.slice(0, 3).map((activity: any, index: number) => (
