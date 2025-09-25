@@ -81,7 +81,7 @@ const reportCategories = ['All', 'Financial', 'Members', 'Loans', 'Dividends', '
 
 export default function ReportsView() {
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const { summary, loading, exportToCSV, generateReport } = useFinancialData();
+  const { summary, loading, exportToPDF, generateReport } = useFinancialData();
 
   const filteredReports = availableReports.filter(report => 
     selectedCategory === 'All' || report.category === selectedCategory
@@ -98,11 +98,11 @@ export default function ReportsView() {
           { metric: 'Total Expenses', amount: summary.totalExpenses },
           { metric: 'Available Cash', amount: summary.availableCash }
         ];
-        exportToCSV(financialData, 'financial-summary');
+        exportToPDF(financialData, 'financial-summary');
         break;
       
       case 'member-balances':
-        exportToCSV(summary.memberBalances, 'member-balances');
+        exportToPDF(summary.memberBalances, 'member-balances');
         break;
         
       case 'contributions-summary':
@@ -111,11 +111,21 @@ export default function ReportsView() {
           memberName: member.memberName,
           totalContributions: member.totalContributions
         }));
-        exportToCSV(contributionSummary, 'contributions-summary');
+        exportToPDF(contributionSummary, 'contributions-summary');
         break;
         
-      default:
-        console.log('Generating report:', reportType);
+      case 'print-report':
+        const printData = [
+          { metric: 'Total Contributions', amount: summary.totalContributions },
+          { metric: 'Total Loans', amount: summary.totalLoans },
+          { metric: 'Total Expenses', amount: summary.totalExpenses },
+          { metric: 'Available Cash', amount: summary.availableCash }
+        ];
+        const { generateFinancialSummaryPDF } = await import('@/utils/pdfGenerator');
+        const generator = new (await import('@/utils/pdfGenerator')).PDFGenerator();
+        const doc = generator.generateFinancialReport(printData, 'Financial Summary Report');
+        generator.print();
+        break;
     }
   };
 
@@ -194,10 +204,10 @@ export default function ReportsView() {
           
           <div className="flex justify-end space-x-2 mt-4">
             <Button onClick={() => handleGenerateReport('financial-summary')} variant="outline">
-              Export Financial Summary
+              Export Financial Summary (PDF)
             </Button>
             <Button onClick={() => handleGenerateReport('member-balances')}>
-              Export Member Balances
+              Export Member Balances (PDF)
             </Button>
           </div>
         </motion.div>
@@ -393,7 +403,11 @@ export default function ReportsView() {
               <button className="p-2 hover:bg-secondary rounded-lg transition-colors">
                 <EyeIcon className="h-4 w-4 text-muted-foreground" />
               </button>
-              <button className="p-2 hover:bg-secondary rounded-lg transition-colors">
+              <button 
+                className="p-2 hover:bg-secondary rounded-lg transition-colors"
+                onClick={() => handleGenerateReport('print-report')}
+                title="Print Report"
+              >
                 <PrinterIcon className="h-4 w-4 text-muted-foreground" />
               </button>
             </div>

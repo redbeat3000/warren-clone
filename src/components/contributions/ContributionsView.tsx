@@ -124,6 +124,16 @@ export default function ContributionsView() {
     filter === 'all' || contrib.status === filter
   );
 
+  const handlePrintContributions = async () => {
+    const { printContributionsPDF } = await import('@/utils/pdfGenerator');
+    printContributionsPDF(filteredContributions);
+  };
+
+  const handleExportContributions = async () => {
+    const { generateContributionsPDF } = await import('@/utils/pdfGenerator');
+    generateContributionsPDF(filteredContributions);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -141,9 +151,10 @@ export default function ContributionsView() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             className="btn-secondary flex items-center space-x-2"
+            onClick={handleExportContributions}
           >
             <DocumentArrowDownIcon className="h-5 w-5" />
-            <span>Import CSV</span>
+            <span>Export PDF</span>
           </motion.button>
           <Dialog open={isAddContributionOpen} onOpenChange={setIsAddContributionOpen}>
             <DialogTrigger asChild>
@@ -331,7 +342,11 @@ export default function ContributionsView() {
                       <button className="p-1 hover:bg-secondary rounded transition-colors">
                         <EyeIcon className="h-4 w-4 text-muted-foreground" />
                       </button>
-                      <button className="p-1 hover:bg-secondary rounded transition-colors">
+                      <button 
+                        className="p-1 hover:bg-secondary rounded transition-colors"
+                        onClick={handlePrintContributions}
+                        title="Print Contributions"
+                      >
                         <PrinterIcon className="h-4 w-4 text-muted-foreground" />
                       </button>
                     </div>

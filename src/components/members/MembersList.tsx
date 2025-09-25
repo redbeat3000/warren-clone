@@ -316,80 +316,16 @@ export default function MembersList() {
           .order('created_at', { ascending: false })
       ]);
 
-      const contributions = contributionsRes.data || [];
-      const fines = finesRes.data || [];
-      const loans = loansRes.data || [];
-      const meetingAttendance = meetingAttendanceRes.data || [];
+      const data = {
+        contributions: contributionsRes.data || [],
+        fines: finesRes.data || [],
+        loans: loansRes.data || [],
+        meetingAttendance: meetingAttendanceRes.data || []
+      };
 
-      // Calculate totals
-      const totalContributions = contributions.reduce((sum, c) => sum + parseFloat(c.amount?.toString() || '0'), 0);
-      const totalFines = fines.reduce((sum, f) => sum + parseFloat(f.amount?.toString() || '0'), 0);
-      const totalLoans = loans.reduce((sum, l) => sum + parseFloat(l.principal?.toString() || '0'), 0);
-      const meetingsAttended = meetingAttendance.filter(a => a.status === 'present').length;
-      const totalMeetings = meetingAttendance.length;
-
-      // Create CSV content
-      let csvContent = `Member Report - ${member.firstName} ${member.lastName} (${member.memberNo})\n\n`;
-      
-      // Summary section
-      csvContent += `SUMMARY\n`;
-      csvContent += `Member Number,${member.memberNo}\n`;
-      csvContent += `Name,"${member.firstName} ${member.lastName}"\n`;
-      csvContent += `Email,${member.email}\n`;
-      csvContent += `Phone,${member.phone}\n`;
-      csvContent += `Status,${member.status}\n`;
-      csvContent += `Role,${member.role}\n`;
-      csvContent += `Join Date,${member.joinDate}\n`;
-      csvContent += `Total Contributions,"KES ${totalContributions.toLocaleString()}"\n`;
-      csvContent += `Total Fines,"KES ${totalFines.toLocaleString()}"\n`;
-      csvContent += `Total Loans,"KES ${totalLoans.toLocaleString()}"\n`;
-      csvContent += `Meetings Attended,${meetingsAttended}/${totalMeetings}\n\n`;
-
-      // Contributions section
-      csvContent += `CONTRIBUTIONS\n`;
-      csvContent += `Date,Amount,Payment Method,Receipt No,Notes\n`;
-      contributions.forEach(c => {
-        const amount = parseFloat(c.amount?.toString() || '0');
-        csvContent += `${c.contribution_date},"KES ${amount.toLocaleString()}",${c.payment_method || 'N/A'},${c.receipt_no || 'N/A'},"${c.notes || 'N/A'}"\n`;
-      });
-      csvContent += `\n`;
-
-      // Fines section
-      csvContent += `FINES\n`;
-      csvContent += `Date,Amount,Reason,Status\n`;
-      fines.forEach(f => {
-        const amount = parseFloat(f.amount?.toString() || '0');
-        csvContent += `${f.fine_date},"KES ${amount.toLocaleString()}","${f.reason || 'N/A'}",${f.status}\n`;
-      });
-      csvContent += `\n`;
-
-      // Loans section
-      csvContent += `LOANS\n`;
-      csvContent += `Issue Date,Principal,Interest Rate,Term (Months),Due Date,Status,Interest Type,Notes\n`;
-      loans.forEach(l => {
-        const principal = parseFloat(l.principal?.toString() || '0');
-        csvContent += `${l.issue_date},"KES ${principal.toLocaleString()}",${l.interest_rate}%,${l.term_months},${l.due_date || 'N/A'},${l.status},${l.interest_type},"${l.notes || 'N/A'}"\n`;
-      });
-      csvContent += `\n`;
-
-      // Meeting attendance section
-      csvContent += `MEETING ATTENDANCE\n`;
-      csvContent += `Meeting,Date,Status,Notes\n`;
-      meetingAttendance.forEach(a => {
-        const meeting = (a as any).meetings;
-        csvContent += `"${meeting?.title || 'N/A'}",${meeting?.meeting_date || 'N/A'},${a.status},"${a.notes || 'N/A'}"\n`;
-      });
-
-      // Create and download file
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `${member.firstName}_${member.lastName}_Report_${new Date().toISOString().split('T')[0]}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Generate PDF report
+      const { generateMemberReportPDF } = await import('@/utils/pdfGenerator');
+      await generateMemberReportPDF(member, data);
 
     } catch (error) {
       console.error('Error generating member report:', error);
