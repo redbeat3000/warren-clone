@@ -15,6 +15,9 @@ import DividendsView from '../dividends/DividendsView';
 import ReportsView from '../reports/ReportsView';
 import MessagesView from '../messages/MessagesView';
 import SettingsView from '../settings/SettingsView';
+import MeetingsView from '../meetings/MeetingsView';
+import DocumentsView from '../documents/DocumentsView';
+import AuditLogsView from '../audit/AuditLogsView';
 
 // Role-based component rendering
 const sectionComponents = {
@@ -25,8 +28,11 @@ const sectionComponents = {
   fines: FinesView,
   expenses: ExpensesView,
   dividends: DividendsView,
+  meetings: MeetingsView,
+  documents: DocumentsView,
   reports: ReportsView,
   messages: MessagesView,
+  audit: AuditLogsView,
   settings: SettingsView,
 };
 
@@ -38,8 +44,11 @@ const sectionTitles = {
   fines: 'Fines',
   expenses: 'Expenses',
   dividends: 'Dividends',
-  reports: 'Reports',
-  messages: 'Messages',
+  meetings: 'Meetings & Events',
+  documents: 'Document Management',
+  reports: 'Reports & Analytics',
+  messages: 'Messages & Notifications',
+  audit: 'Audit Trail',
   settings: 'Settings',
 };
 
