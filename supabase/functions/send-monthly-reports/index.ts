@@ -81,11 +81,12 @@ const handler = async (req: Request): Promise<Response> => {
     const totalExpenses = expenses?.reduce((sum, e) => sum + parseFloat(e.amount || '0'), 0) || 0;
     const expensesCount = expenses?.length || 0;
 
-    // Get all active members
+    // Get all admin users only
     const { data: members, error: membersError } = await supabase
       .from('users')
       .select('email, first_name, last_name')
       .eq('status', 'active')
+      .in('role', ['admin', 'chairperson', 'secretary', 'treasurer'])
       .not('email', 'is', null);
 
     if (membersError) {

@@ -60,6 +60,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     let totalSent = 0;
+    const allResults = [];
 
     // Send reminders for each meeting
     for (const meeting of meetings) {
@@ -68,8 +69,12 @@ const handler = async (req: Request): Promise<Response> => {
       const meetingDate = new Date(meeting.meeting_date);
       const meetingTime = meeting.meeting_time || '14:00';
       
-      const emailPromises = members.map(async (member) => {
+      // Send emails sequentially to respect rate limits (max 2 per second)
+      for (let i = 0; i < members.length; i++) {
+        const member = members[i];
         try {
+          console.log(`Sending meeting reminder to ${member.email} (${i + 1}/${members.length}) for "${meeting.title}"`);
+          
           const emailResponse = await resend.emails.send({
             from: "Chama Management <onboarding@resend.dev>",
             to: [member.email],
@@ -97,19 +102,38 @@ const handler = async (req: Request): Promise<Response> => {
             `,
           });
 
-          console.log(`Email sent to ${member.email}:`, emailResponse);
-          return { success: true, email: member.email };
+          console.log(`✅ Meeting reminder sent successfully to ${member.email}`);
+          allResults.push({ success: true, email: member.email, meeting: meeting.title });
+          totalSent++;
+          
         } catch (error: any) {
-          console.error(`Failed to send email to ${member.email}:`, error);
-          return { success: false, email: member.email, error: error.message };
+          console.error(`❌ Failed to send reminder to ${member.email}:`, error);
+          allResults.push({ 
+            success: false, 
+            email: member.email, 
+            meeting: meeting.title,
+            error: error.message,
+            statusCode: error.statusCode || 'unknown'
+          });
         }
-      });
-
-      const results = await Promise.all(emailPromises);
-      const successCount = results.filter(r => r.success).length;
-      totalSent += successCount;
+        
+        // Add delay to respect rate limits (600ms = max 2 requests per second)
+        if (i < members.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 600));
+        }
+      }
       
-      console.log(`Meeting "${meeting.title}": ${successCount}/${members.length} emails sent`);
+      const meetingSuccessCount = allResults.filter(r => r.success && r.meeting === meeting.title).length;
+      console.log(`Meeting "${meeting.title}": ${meetingSuccessCount}/${members.length} emails sent successfully`);
+    }
+
+    // Count failed emails and their reasons
+    const failedResults = allResults.filter(r => !r.success);
+    if (failedResults.length > 0) {
+      console.log("Failed meeting reminder details:");
+      failedResults.forEach(result => {
+        console.log(`- ${result.email} (${result.meeting}): ${result.error} (Status: ${result.statusCode})`);
+      });
     }
 
     // Log the activity
@@ -120,7 +144,9 @@ const handler = async (req: Request): Promise<Response> => {
         meta: {
           meetings_count: meetings.length,
           emails_sent: totalSent,
-          members_count: members.length
+          emails_failed: failedResults.length,
+          members_count: members.length,
+          failed_emails: failedResults.map(r => ({ email: r.email, meeting: r.meeting, error: r.error }))
         }
       });
 
@@ -130,10 +156,14 @@ const handler = async (req: Request): Promise<Response> => {
 
     return new Response(
       JSON.stringify({ 
-        message: `Meeting reminders sent successfully`,
+        message: totalSent === (meetings.length * members.length) 
+          ? `Meeting reminders sent successfully to all members` 
+          : `Meeting reminders sent: ${totalSent} successful, ${failedResults.length} failed`,
         meetings_processed: meetings.length,
         emails_sent: totalSent,
-        members_notified: members.length
+        emails_failed: failedResults.length,
+        members_notified: members.length,
+        failed_details: failedResults.length > 0 ? failedResults : undefined
       }),
       {
         status: 200,
