@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/hooks/useAuth";
+import { useState } from "react";
 
 
 interface HeaderProps {
@@ -29,8 +30,8 @@ export default function Header({ title, subtitle }: HeaderProps) {
     window.dispatchEvent(new CustomEvent('navigate-to-section', { detail: 'settings' }));
   };
 
-  // Sample notifications data
-  const notifications = [
+  // Sample notifications data with state
+  const [notifications, setNotifications] = useState([
     {
       id: 1,
       type: 'contribution',
@@ -63,9 +64,15 @@ export default function Header({ title, subtitle }: HeaderProps) {
       read: true,
       icon: Check
     }
-  ];
+  ]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  const markAllAsRead = () => {
+    setNotifications(prev => 
+      prev.map(notification => ({ ...notification, read: true }))
+    );
+  };
 
   return (
     <motion.header
@@ -140,7 +147,12 @@ export default function Header({ title, subtitle }: HeaderProps) {
               ))}
             </div>
             <div className="p-2 border-t">
-              <Button variant="ghost" className="w-full text-sm">
+              <Button 
+                variant="ghost" 
+                className="w-full text-sm" 
+                onClick={markAllAsRead}
+                disabled={unreadCount === 0}
+              >
                 Mark all as read
               </Button>
             </div>
