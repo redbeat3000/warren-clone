@@ -18,17 +18,17 @@ interface PDFOptions {
 }
 
 export class PDFGenerator {
-  private doc: jsPDF;
-  private pageHeight: number;
-  private margin: number = 20;
-  private currentY: number = 30;
+  public doc: jsPDF;
+  public pageHeight: number;
+  public margin: number = 20;
+  public currentY: number = 30;
 
   constructor() {
     this.doc = new jsPDF();
     this.pageHeight = this.doc.internal.pageSize.height;
   }
 
-  private addHeader(title: string, subtitle?: string) {
+  public addHeader(title: string, subtitle?: string) {
     // Add logo/header area
     this.doc.setFontSize(20);
     this.doc.setFont('helvetica', 'bold');
@@ -49,7 +49,7 @@ export class PDFGenerator {
     this.currentY += 20;
   }
 
-  private checkPageBreak(requiredSpace: number = 30) {
+  public checkPageBreak(requiredSpace: number = 30) {
     if (this.currentY + requiredSpace > this.pageHeight - this.margin) {
       this.doc.addPage();
       this.currentY = this.margin;
@@ -362,4 +362,383 @@ export const printContributionsPDF = (contributions: any[]) => {
   const generator = new PDFGenerator();
   const doc = generator.generateContributionReport(contributions);
   generator.print();
+};
+
+export const generateLoansReportPDF = (loans: any[]) => {
+  const generator = new PDFGenerator();
+  generator.addHeader('Loans Report', 'Active Loans and Repayment Summary');
+  
+  if (loans.length === 0) {
+    generator.doc.text('No loans found', generator.margin, generator.currentY);
+    generator.download(`loans_report_${new Date().toISOString().split('T')[0]}`);
+    return;
+  }
+
+  // Summary stats
+  const totalLoaned = loans.reduce((sum, l) => sum + parseFloat(l.principal?.toString() || '0'), 0);
+  const totalOutstanding = loans.reduce((sum, l) => sum + parseFloat(l.balance?.toString() || '0'), 0);
+  const activeLoans = loans.filter(l => l.status === 'active').length;
+
+  const summaryData = [
+    ['Total Amount Loaned', `KES ${totalLoaned.toLocaleString()}`],
+    ['Outstanding Balance', `KES ${totalOutstanding.toLocaleString()}`],
+    ['Active Loans', activeLoans.toString()],
+    ['Total Loans', loans.length.toString()]
+  ];
+
+  generator.doc.autoTable({
+    startY: generator.currentY,
+    head: [['Metric', 'Value']],
+    body: summaryData,
+    theme: 'striped',
+    headStyles: { fillColor: [39, 174, 96] },
+    margin: { left: generator.margin, right: generator.margin }
+  });
+
+  generator.currentY = generator.doc.lastAutoTable.finalY + 20;
+  generator.checkPageBreak();
+
+  // Detailed loans
+  const loansData = loans.map(l => [
+    l.loanNo || 'N/A',
+    l.memberName || 'N/A',
+    `KES ${parseFloat(l.principal?.toString() || '0').toLocaleString()}`,
+    `KES ${parseFloat(l.balance?.toString() || '0').toLocaleString()}`,
+    `${l.interestRate}%`,
+    l.term ? `${l.term} months` : 'N/A',
+    l.status || 'N/A'
+  ]);
+
+  generator.doc.autoTable({
+    startY: generator.currentY,
+    head: [['Loan No', 'Member', 'Principal', 'Balance', 'Rate', 'Term', 'Status']],
+    body: loansData,
+    theme: 'striped',
+    headStyles: { fillColor: [52, 152, 219] },
+    margin: { left: generator.margin, right: generator.margin },
+    styles: { fontSize: 8 }
+  });
+
+  generator.download(`loans_report_${new Date().toISOString().split('T')[0]}`);
+};
+
+export const generateExpensesReportPDF = (expenses: any[]) => {
+  const generator = new PDFGenerator();
+  generator.addHeader('Expenses Report', 'Operational Expenses Summary');
+  
+  if (expenses.length === 0) {
+    generator.doc.text('No expenses found', generator.margin, generator.currentY);
+    generator.download(`expenses_report_${new Date().toISOString().split('T')[0]}`);
+    return;
+  }
+
+  // Summary stats
+  const totalExpenses = expenses.reduce((sum, e) => sum + parseFloat(e.amount?.toString() || '0'), 0);
+  const approvedExpenses = expenses.filter(e => e.status === 'approved').length;
+  const categories = [...new Set(expenses.map(e => e.category))];
+
+  const summaryData = [
+    ['Total Expenses', `KES ${totalExpenses.toLocaleString()}`],
+    ['Approved Expenses', approvedExpenses.toString()],
+    ['Total Categories', categories.length.toString()],
+    ['Total Entries', expenses.length.toString()]
+  ];
+
+  generator.doc.autoTable({
+    startY: generator.currentY,
+    head: [['Metric', 'Value']],
+    body: summaryData,
+    theme: 'striped',
+    headStyles: { fillColor: [231, 76, 60] },
+    margin: { left: generator.margin, right: generator.margin }
+  });
+
+  generator.currentY = generator.doc.lastAutoTable.finalY + 20;
+  generator.checkPageBreak();
+
+  // Detailed expenses
+  const expensesData = expenses.map(e => [
+    e.expenseNo || 'N/A',
+    e.category || 'N/A',
+    e.description || 'N/A',
+    `KES ${parseFloat(e.amount?.toString() || '0').toLocaleString()}`,
+    new Date(e.date).toLocaleDateString(),
+    e.status || 'N/A'
+  ]);
+
+  generator.doc.autoTable({
+    startY: generator.currentY,
+    head: [['Expense No', 'Category', 'Description', 'Amount', 'Date', 'Status']],
+    body: expensesData,
+    theme: 'striped',
+    headStyles: { fillColor: [231, 76, 60] },
+    margin: { left: generator.margin, right: generator.margin },
+    styles: { fontSize: 8 }
+  });
+
+  generator.download(`expenses_report_${new Date().toISOString().split('T')[0]}`);
+};
+
+export const generateFinesReportPDF = (fines: any[]) => {
+  const generator = new PDFGenerator();
+  generator.addHeader('Fines & Penalties Report', 'Member Fines Summary');
+  
+  if (fines.length === 0) {
+    generator.doc.text('No fines found', generator.margin, generator.currentY);
+    generator.download(`fines_report_${new Date().toISOString().split('T')[0]}`);
+    return;
+  }
+
+  // Summary stats
+  const totalFines = fines.reduce((sum, f) => sum + parseFloat(f.amount?.toString() || '0'), 0);
+  const paidFines = fines.filter(f => f.status === 'paid').length;
+  const overdueFines = fines.filter(f => f.status === 'overdue').length;
+
+  const summaryData = [
+    ['Total Fines Amount', `KES ${totalFines.toLocaleString()}`],
+    ['Paid Fines', paidFines.toString()],
+    ['Overdue Fines', overdueFines.toString()],
+    ['Total Fines', fines.length.toString()]
+  ];
+
+  generator.doc.autoTable({
+    startY: generator.currentY,
+    head: [['Metric', 'Value']],
+    body: summaryData,
+    theme: 'striped',
+    headStyles: { fillColor: [255, 193, 7] },
+    margin: { left: generator.margin, right: generator.margin }
+  });
+
+  generator.currentY = generator.doc.lastAutoTable.finalY + 20;
+  generator.checkPageBreak();
+
+  // Detailed fines
+  const finesData = fines.map(f => [
+    f.fineNo || 'N/A',
+    f.memberName || 'N/A',
+    f.reason || 'N/A',
+    `KES ${parseFloat(f.amount?.toString() || '0').toLocaleString()}`,
+    new Date(f.dueDate).toLocaleDateString(),
+    f.status || 'N/A'
+  ]);
+
+  generator.doc.autoTable({
+    startY: generator.currentY,
+    head: [['Fine No', 'Member', 'Reason', 'Amount', 'Due Date', 'Status']],
+    body: finesData,
+    theme: 'striped',
+    headStyles: { fillColor: [255, 193, 7] },
+    margin: { left: generator.margin, right: generator.margin },
+    styles: { fontSize: 8 }
+  });
+
+  generator.download(`fines_report_${new Date().toISOString().split('T')[0]}`);
+};
+
+export const generateDividendsReportPDF = (dividends: any[], memberDividends: any[]) => {
+  const generator = new PDFGenerator();
+  generator.addHeader('Dividends Report', 'Member Dividends Distribution Summary');
+  
+  if (dividends.length === 0) {
+    generator.doc.text('No dividends found', generator.margin, generator.currentY);
+    generator.download(`dividends_report_${new Date().toISOString().split('T')[0]}`);
+    return;
+  }
+
+  // Summary stats
+  const totalDistributed = dividends.filter(d => d.status === 'distributed').reduce((sum, d) => sum + d.totalAmount, 0);
+  const pendingDistribution = dividends.filter(d => d.status === 'calculated').reduce((sum, d) => sum + d.totalAmount, 0);
+
+  const summaryData = [
+    ['Total Distributed', `KES ${totalDistributed.toLocaleString()}`],
+    ['Pending Distribution', `KES ${pendingDistribution.toLocaleString()}`],
+    ['Distribution Periods', dividends.length.toString()],
+    ['Total Members', memberDividends.length.toString()]
+  ];
+
+  generator.doc.autoTable({
+    startY: generator.currentY,
+    head: [['Metric', 'Value']],
+    body: summaryData,
+    theme: 'striped',
+    headStyles: { fillColor: [142, 68, 173] },
+    margin: { left: generator.margin, right: generator.margin }
+  });
+
+  generator.currentY = generator.doc.lastAutoTable.finalY + 20;
+  generator.checkPageBreak();
+
+  // Dividend periods
+  generator.doc.setFontSize(14);
+  generator.doc.setFont('helvetica', 'bold');
+  generator.doc.text('Dividend History', generator.margin, generator.currentY);
+  generator.currentY += 10;
+
+  const dividendsData = dividends.map(d => [
+    `${d.year} ${d.period}`,
+    `KES ${d.totalAmount.toLocaleString()}`,
+    `KES ${d.perShare}`,
+    d.shares.toLocaleString(),
+    d.dateDistributed ? new Date(d.dateDistributed).toLocaleDateString() : 'Pending',
+    d.status
+  ]);
+
+  generator.doc.autoTable({
+    startY: generator.currentY,
+    head: [['Period', 'Total Amount', 'Per Share', 'Shares', 'Date Distributed', 'Status']],
+    body: dividendsData,
+    theme: 'striped',
+    headStyles: { fillColor: [142, 68, 173] },
+    margin: { left: generator.margin, right: generator.margin },
+    styles: { fontSize: 9 }
+  });
+
+  generator.currentY = generator.doc.lastAutoTable.finalY + 20;
+  generator.checkPageBreak();
+
+  // Member dividends
+  if (memberDividends.length > 0) {
+    generator.doc.setFontSize(14);
+    generator.doc.setFont('helvetica', 'bold');
+    generator.doc.text('Member Dividend Breakdown', generator.margin, generator.currentY);
+    generator.currentY += 10;
+
+    const memberData = memberDividends.map(m => [
+      m.memberName,
+      m.shares.toString(),
+      `KES ${m.q1Dividend?.toLocaleString() || '0'}`,
+      `KES ${m.q2Dividend?.toLocaleString() || '0'}`,
+      `KES ${m.totalDividend?.toLocaleString() || '0'}`
+    ]);
+
+    generator.doc.autoTable({
+      startY: generator.currentY,
+      head: [['Member', 'Shares', 'Q1 Dividend', 'Q2 Dividend', 'Total 2024']],
+      body: memberData,
+      theme: 'striped',
+      headStyles: { fillColor: [142, 68, 173] },
+      margin: { left: generator.margin, right: generator.margin },
+      styles: { fontSize: 9 }
+    });
+  }
+
+  generator.download(`dividends_report_${new Date().toISOString().split('T')[0]}`);
+};
+
+export const generateMeetingsReportPDF = (meetings: any[]) => {
+  const generator = new PDFGenerator();
+  generator.addHeader('Meetings Report', 'Chama Meetings and Events Summary');
+  
+  if (meetings.length === 0) {
+    generator.doc.text('No meetings found', generator.margin, generator.currentY);
+    generator.download(`meetings_report_${new Date().toISOString().split('T')[0]}`);
+    return;
+  }
+
+  // Summary stats
+  const upcomingMeetings = meetings.filter(m => m.status === 'scheduled').length;
+  const completedMeetings = meetings.filter(m => m.status === 'completed').length;
+  const totalAttendees = meetings.reduce((sum, m) => sum + (m.attendees_count || 0), 0);
+  const averageAttendance = meetings.length > 0 ? Math.round(totalAttendees / meetings.length) : 0;
+
+  const summaryData = [
+    ['Total Meetings', meetings.length.toString()],
+    ['Upcoming Meetings', upcomingMeetings.toString()],
+    ['Completed Meetings', completedMeetings.toString()],
+    ['Average Attendance', averageAttendance.toString()]
+  ];
+
+  generator.doc.autoTable({
+    startY: generator.currentY,
+    head: [['Metric', 'Value']],
+    body: summaryData,
+    theme: 'striped',
+    headStyles: { fillColor: [26, 188, 156] },
+    margin: { left: generator.margin, right: generator.margin }
+  });
+
+  generator.currentY = generator.doc.lastAutoTable.finalY + 20;
+  generator.checkPageBreak();
+
+  // Detailed meetings
+  const meetingsData = meetings.map(m => [
+    m.title || 'N/A',
+    new Date(m.date).toLocaleDateString(),
+    m.time || 'N/A',
+    m.venue || 'N/A',
+    (m.attendees_count || 0).toString(),
+    m.status || 'N/A'
+  ]);
+
+  generator.doc.autoTable({
+    startY: generator.currentY,
+    head: [['Title', 'Date', 'Time', 'Venue', 'Attendees', 'Status']],
+    body: meetingsData,
+    theme: 'striped',
+    headStyles: { fillColor: [26, 188, 156] },
+    margin: { left: generator.margin, right: generator.margin },
+    styles: { fontSize: 8 }
+  });
+
+  generator.download(`meetings_report_${new Date().toISOString().split('T')[0]}`);
+};
+
+export const generateAuditLogsReportPDF = (auditLogs: any[]) => {
+  const generator = new PDFGenerator();
+  generator.addHeader('Audit Trail Report', 'System Activity and User Actions');
+  
+  if (auditLogs.length === 0) {
+    generator.doc.text('No audit logs found', generator.margin, generator.currentY);
+    generator.download(`audit_logs_report_${new Date().toISOString().split('T')[0]}`);
+    return;
+  }
+
+  // Summary stats
+  const uniqueActions = [...new Set(auditLogs.map(log => log.action))].length;
+  const todayActions = auditLogs.filter(log => 
+    new Date(log.created_at).toDateString() === new Date().toDateString()
+  ).length;
+  const uniqueActors = new Set(auditLogs.map(log => log.actor_id).filter(Boolean)).size;
+
+  const summaryData = [
+    ['Total Actions', auditLogs.length.toString()],
+    ['Action Types', uniqueActions.toString()],
+    ['Today\'s Actions', todayActions.toString()],
+    ['Active Users', uniqueActors.toString()]
+  ];
+
+  generator.doc.autoTable({
+    startY: generator.currentY,
+    head: [['Metric', 'Value']],
+    body: summaryData,
+    theme: 'striped',
+    headStyles: { fillColor: [52, 73, 94] },
+    margin: { left: generator.margin, right: generator.margin }
+  });
+
+  generator.currentY = generator.doc.lastAutoTable.finalY + 20;
+  generator.checkPageBreak();
+
+  // Recent activities (last 50)
+  const recentLogs = auditLogs.slice(0, 50);
+  const logsData = recentLogs.map(log => [
+    log.action || 'N/A',
+    log.actor_name || 'System',
+    new Date(log.created_at).toLocaleDateString(),
+    new Date(log.created_at).toLocaleTimeString(),
+    log.meta ? JSON.stringify(log.meta).substring(0, 50) + '...' : 'No details'
+  ]);
+
+  generator.doc.autoTable({
+    startY: generator.currentY,
+    head: [['Action', 'Actor', 'Date', 'Time', 'Details']],
+    body: logsData,
+    theme: 'striped',
+    headStyles: { fillColor: [52, 73, 94] },
+    margin: { left: generator.margin, right: generator.margin },
+    styles: { fontSize: 7 }
+  });
+
+  generator.download(`audit_logs_report_${new Date().toISOString().split('T')[0]}`);
 };

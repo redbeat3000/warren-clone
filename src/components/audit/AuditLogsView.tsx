@@ -5,7 +5,8 @@ import {
   UserIcon,
   ClockIcon,
   EyeIcon,
-  MagnifyingGlassIcon
+  MagnifyingGlassIcon,
+  DocumentArrowDownIcon
 } from '@heroicons/react/24/outline';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
@@ -109,6 +110,11 @@ export default function AuditLogsView() {
   ).length;
   const uniqueActors = new Set(auditLogs.map(log => log.actor_id).filter(Boolean)).size;
 
+  const handleExportAuditLogs = async () => {
+    const { generateAuditLogsReportPDF } = await import('@/utils/pdfGenerator');
+    generateAuditLogsReportPDF(filteredLogs);
+  };
+
   const formatMetaData = (meta: any) => {
     if (!meta || typeof meta !== 'object') return 'No details';
     
@@ -142,6 +148,15 @@ export default function AuditLogsView() {
           <h1 className="text-3xl font-bold text-foreground">Audit Trail</h1>
           <p className="text-muted-foreground mt-1">Track all system activities and member actions</p>
         </div>
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className="btn-secondary flex items-center space-x-2"
+          onClick={handleExportAuditLogs}
+        >
+          <DocumentArrowDownIcon className="h-5 w-5" />
+          <span>Export PDF</span>
+        </motion.button>
       </motion.div>
 
       {/* Stats Cards */}

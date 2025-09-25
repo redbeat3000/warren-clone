@@ -6,7 +6,8 @@ import {
   CalendarDaysIcon,
   CurrencyDollarIcon,
   EyeIcon,
-  DocumentTextIcon
+  DocumentTextIcon,
+  DocumentArrowDownIcon
 } from '@heroicons/react/24/outline';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import AddExpenseForm from './AddExpenseForm';
@@ -142,6 +143,11 @@ export default function ExpensesView() {
     filter === 'all' || expense.status === filter
   );
 
+  const handleExportExpenses = async () => {
+    const { generateExpensesReportPDF } = await import('@/utils/pdfGenerator');
+    generateExpensesReportPDF(filteredExpenses);
+  };
+
   // Group expenses by category
   const expensesByCategory = categories.map(category => {
     const categoryExpenses = activeExpenses.filter(exp => exp.category === category);
@@ -161,24 +167,35 @@ export default function ExpensesView() {
           <h1 className="text-3xl font-bold text-foreground">Expenses</h1>
           <p className="text-muted-foreground mt-1">Track and manage Chama operational expenses</p>
         </div>
-        <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
-          <DialogTrigger asChild>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="btn-primary flex items-center space-x-2"
-            >
-              <PlusIcon className="h-5 w-5" />
-              <span>Record Expense</span>
-            </motion.button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <AddExpenseForm 
-              onSuccess={() => setRefreshKey(prev => prev + 1)} 
-              onClose={() => setIsAddExpenseOpen(false)} 
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center space-x-3">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="btn-secondary flex items-center space-x-2"
+            onClick={handleExportExpenses}
+          >
+            <DocumentArrowDownIcon className="h-5 w-5" />
+            <span>Export PDF</span>
+          </motion.button>
+          <Dialog open={isAddExpenseOpen} onOpenChange={setIsAddExpenseOpen}>
+            <DialogTrigger asChild>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="btn-primary flex items-center space-x-2"
+              >
+                <PlusIcon className="h-5 w-5" />
+                <span>Record Expense</span>
+              </motion.button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <AddExpenseForm 
+                onSuccess={() => setRefreshKey(prev => prev + 1)} 
+                onClose={() => setIsAddExpenseOpen(false)} 
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
       </motion.div>
 
       {/* Summary Cards */}

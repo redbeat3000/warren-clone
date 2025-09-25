@@ -7,7 +7,8 @@ import {
   ClockIcon,
   DocumentTextIcon,
   EyeIcon,
-  PencilIcon
+  PencilIcon,
+  DocumentArrowDownIcon
 } from '@heroicons/react/24/outline';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import AddMeetingForm from './AddMeetingForm';
@@ -62,6 +63,11 @@ export default function MeetingsView() {
   const totalAttendees = meetings.reduce((sum, m) => sum + m.attendees_count, 0);
   const averageAttendance = meetings.length > 0 ? Math.round(totalAttendees / meetings.length) : 0;
 
+  const handleExportMeetings = async () => {
+    const { generateMeetingsReportPDF } = await import('@/utils/pdfGenerator');
+    generateMeetingsReportPDF(meetings);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -74,27 +80,38 @@ export default function MeetingsView() {
           <h1 className="text-3xl font-bold text-foreground">Meetings & Events</h1>
           <p className="text-muted-foreground mt-1">Schedule and manage Chama meetings and events</p>
         </div>
-        <Dialog open={isNewMeetingOpen} onOpenChange={setIsNewMeetingOpen}>
-          <DialogTrigger asChild>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="btn-primary flex items-center space-x-2"
-            >
-              <PlusIcon className="h-5 w-5" />
-              <span>Schedule Meeting</span>
-            </motion.button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <AddMeetingForm 
-              onSuccess={() => {
-                setIsNewMeetingOpen(false);
-                // Refresh meetings
-              }} 
-              onClose={() => setIsNewMeetingOpen(false)} 
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center space-x-3">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="btn-secondary flex items-center space-x-2"
+            onClick={handleExportMeetings}
+          >
+            <DocumentArrowDownIcon className="h-5 w-5" />
+            <span>Export PDF</span>
+          </motion.button>
+          <Dialog open={isNewMeetingOpen} onOpenChange={setIsNewMeetingOpen}>
+            <DialogTrigger asChild>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="btn-primary flex items-center space-x-2"
+              >
+                <PlusIcon className="h-5 w-5" />
+                <span>Schedule Meeting</span>
+              </motion.button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <AddMeetingForm 
+                onSuccess={() => {
+                  setIsNewMeetingOpen(false);
+                  // Refresh meetings
+                }} 
+                onClose={() => setIsNewMeetingOpen(false)} 
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
       </motion.div>
 
       {/* Stats Cards */}

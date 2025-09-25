@@ -6,7 +6,8 @@ import {
   CalendarDaysIcon,
   ExclamationTriangleIcon,
   EyeIcon,
-  CurrencyDollarIcon
+  CurrencyDollarIcon,
+  DocumentArrowDownIcon
 } from '@heroicons/react/24/outline';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import AddLoanForm from './AddLoanForm';
@@ -131,6 +132,11 @@ export default function LoansView() {
     filter === 'all' || loan.status === filter
   );
 
+  const handleExportLoans = async () => {
+    const { generateLoansReportPDF } = await import('@/utils/pdfGenerator');
+    generateLoansReportPDF(filteredLoans);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -143,24 +149,35 @@ export default function LoansView() {
           <h1 className="text-3xl font-bold text-foreground">Loans</h1>
           <p className="text-muted-foreground mt-1">Manage loans, track repayments, and monitor schedules</p>
         </div>
-        <Dialog open={isAddLoanOpen} onOpenChange={setIsAddLoanOpen}>
-          <DialogTrigger asChild>
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="btn-primary flex items-center space-x-2"
-            >
-              <PlusIcon className="h-5 w-5" />
-              <span>Issue Loan</span>
-            </motion.button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <AddLoanForm 
-              onSuccess={() => setRefreshKey(prev => prev + 1)} 
-              onClose={() => setIsAddLoanOpen(false)} 
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center space-x-3">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="btn-secondary flex items-center space-x-2"
+            onClick={handleExportLoans}
+          >
+            <DocumentArrowDownIcon className="h-5 w-5" />
+            <span>Export PDF</span>
+          </motion.button>
+          <Dialog open={isAddLoanOpen} onOpenChange={setIsAddLoanOpen}>
+            <DialogTrigger asChild>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="btn-primary flex items-center space-x-2"
+              >
+                <PlusIcon className="h-5 w-5" />
+                <span>Issue Loan</span>
+              </motion.button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <AddLoanForm 
+                onSuccess={() => setRefreshKey(prev => prev + 1)} 
+                onClose={() => setIsAddLoanOpen(false)} 
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
       </motion.div>
 
       {/* Summary Cards */}

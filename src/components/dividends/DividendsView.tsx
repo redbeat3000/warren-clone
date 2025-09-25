@@ -6,7 +6,8 @@ import {
   CalendarDaysIcon,
   CurrencyDollarIcon,
   EyeIcon,
-  CalculatorIcon
+  CalculatorIcon,
+  DocumentArrowDownIcon
 } from '@heroicons/react/24/outline';
 
 // Sample dividends data
@@ -105,6 +106,11 @@ export default function DividendsView() {
     .filter(div => div.year === 2024)
     .reduce((sum, div) => sum + div.totalAmount, 0);
 
+  const handleExportDividends = async () => {
+    const { generateDividendsReportPDF } = await import('@/utils/pdfGenerator');
+    generateDividendsReportPDF(sampleDividends, memberDividends);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -118,6 +124,15 @@ export default function DividendsView() {
           <p className="text-muted-foreground mt-1">Calculate and distribute member dividends</p>
         </div>
         <div className="flex items-center space-x-3">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="btn-secondary flex items-center space-x-2"
+            onClick={handleExportDividends}
+          >
+            <DocumentArrowDownIcon className="h-5 w-5" />
+            <span>Export PDF</span>
+          </motion.button>
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
