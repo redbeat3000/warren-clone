@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { auditLogger } from '@/utils/auditLogger';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -44,17 +45,29 @@ export default function AddExpenseForm({ onSuccess, onClose }: AddExpenseFormPro
 
   const onSubmit = async (data: ExpenseFormData) => {
     try {
-      const { error } = await supabase
+      const expenseData = {
+        category: data.category,
+        description: data.description,
+        amount: Number(data.amount),
+        expense_date: data.expenseDate,
+        receipt_url: data.receiptUrl || null,
+      };
+
+      const { data: result, error } = await supabase
         .from('expenses')
-        .insert({
-          category: data.category,
-          description: data.description,
-          amount: Number(data.amount),
-          expense_date: data.expenseDate,
-          receipt_url: data.receiptUrl || null,
-        });
+        .insert(expenseData)
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Log the expense creation
+      await auditLogger.logDataChange('create', 'expenses', result.id, {
+        category: data.category,
+        description: data.description,
+        amount: Number(data.amount),
+        expense_date: data.expenseDate
+      });
 
       toast({
         title: 'Success',

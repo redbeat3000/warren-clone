@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { auditLogger } from '@/utils/auditLogger';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -84,7 +85,7 @@ export default function AddMemberForm({ onSuccess, onClose }: AddMemberFormProps
         }
       }
 
-      const { error } = await supabase
+      const { data: result, error } = await supabase
         .from('users')
         .insert({
           first_name: data.firstName,
@@ -94,9 +95,21 @@ export default function AddMemberForm({ onSuccess, onClose }: AddMemberFormProps
           national_id: data.nationalId || null,
           role: data.role as any,
           status: settings.memberApprovalRequired && data.role !== 'chairperson' ? 'pending' : 'active',
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Log the member creation
+      await auditLogger.logDataChange('create', 'users', result.id, {
+        member_name: `${data.firstName} ${data.lastName}`,
+        email: data.email,
+        phone: data.phone,
+        role: data.role,
+        status: result.status,
+        national_id: data.nationalId
+      });
 
       const successMessage = settings.memberApprovalRequired && data.role !== 'chairperson'
         ? 'Member application submitted for approval! Status set to pending.'

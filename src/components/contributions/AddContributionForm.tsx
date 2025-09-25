@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { auditLogger } from '@/utils/auditLogger';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -80,18 +81,32 @@ export default function AddContributionForm({ onSuccess, onClose }: AddContribut
 
   const onSubmit = async (data: ContributionFormData) => {
     try {
-      const { error } = await supabase
+      const contributionData = {
+        member_id: data.memberId,
+        amount: Number(data.amount),
+        payment_method: data.paymentMethod || null,
+        receipt_no: data.receiptNo || null,
+        notes: data.notes || null,
+        contribution_date: data.contributionDate,
+      };
+
+      const { data: result, error } = await supabase
         .from('contributions')
-        .insert({
-          member_id: data.memberId,
-          amount: Number(data.amount),
-          payment_method: data.paymentMethod || null,
-          receipt_no: data.receiptNo || null,
-          notes: data.notes || null,
-          contribution_date: data.contributionDate,
-        });
+        .insert(contributionData)
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Log the contribution creation
+      const selectedMember = members.find(m => m.id === data.memberId);
+      await auditLogger.logDataChange('create', 'contributions', result.id, {
+        member_name: selectedMember ? `${selectedMember.first_name} ${selectedMember.last_name}` : 'Unknown',
+        amount: Number(data.amount),
+        payment_method: data.paymentMethod,
+        contribution_date: data.contributionDate,
+        receipt_no: data.receiptNo
+      });
 
       toast({
         title: 'Success',

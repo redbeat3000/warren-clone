@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { auditLogger } from '@/utils/auditLogger';
 
 interface AuthUser {
   id: string;
@@ -78,6 +79,15 @@ export const useAuth = () => {
           status: data.status,
           photo_url: data.photo_url
         });
+        
+        // Log successful login
+        console.log('Auth user loaded:', data);
+        auditLogger.logAuth('login', data.email || '', {
+          user_id: data.id,
+          role: data.role,
+          status: data.status,
+          login_method: 'session_restore'
+        });
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -92,6 +102,13 @@ export const useAuth = () => {
     });
 
     if (error) {
+      // Log failed login attempt
+      auditLogger.logAuth('login', email, {
+        success: false,
+        error: error.message,
+        login_method: 'email_password'
+      });
+      
       toast({
         title: "Login Failed",
         description: error.message,
@@ -101,6 +118,7 @@ export const useAuth = () => {
       return { error };
     }
 
+    // Log successful login will happen in the auth state change handler
     return { error: null };
   };
 
@@ -121,6 +139,14 @@ export const useAuth = () => {
     });
 
     if (error) {
+      // Log failed signup attempt
+      auditLogger.logAuth('signup', email, {
+        success: false,
+        error: error.message,
+        first_name: firstName,
+        last_name: lastName
+      });
+      
       toast({
         title: "Sign Up Failed", 
         description: error.message,
@@ -129,6 +155,14 @@ export const useAuth = () => {
       setIsLoading(false);
       return { error };
     }
+
+    // Log successful signup attempt
+    auditLogger.logAuth('signup', email, {
+      success: true,
+      first_name: firstName,
+      last_name: lastName,
+      user_id: data.user?.id
+    });
 
     if (data.user && !data.session) {
       toast({
@@ -142,6 +176,14 @@ export const useAuth = () => {
   };
 
   const signOut = async () => {
+    // Log logout before signing out
+    if (authUser) {
+      auditLogger.logAuth('logout', authUser.email, {
+        user_id: authUser.id,
+        role: authUser.role
+      });
+    }
+    
     const { error } = await supabase.auth.signOut();
     if (error) {
       toast({

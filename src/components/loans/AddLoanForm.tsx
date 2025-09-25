@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { auditLogger } from '@/utils/auditLogger';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -93,21 +94,37 @@ export default function AddLoanForm({ onSuccess, onClose }: AddLoanFormProps) {
       const termMonths = Number(data.termMonths);
       const dueDate = calculateDueDate(data.issueDate, termMonths);
 
-      const { error } = await supabase
+      const loanData = {
+        member_id: data.memberId,
+        principal,
+        interest_rate: Number(data.interestRate),
+        term_months: termMonths,
+        interest_type: data.interestType,
+        issue_date: data.issueDate,
+        due_date: dueDate,
+        notes: data.notes || null,
+        status: 'active' as any,
+      };
+
+      const { data: result, error } = await supabase
         .from('loans')
-        .insert({
-          member_id: data.memberId,
-          principal,
-          interest_rate: Number(data.interestRate),
-          term_months: termMonths,
-          interest_type: data.interestType,
-          issue_date: data.issueDate,
-          due_date: dueDate,
-          notes: data.notes || null,
-          status: 'active' as any,
-        });
+        .insert(loanData)
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Log the loan creation
+      const selectedMember = members.find(m => m.id === data.memberId);
+      await auditLogger.logDataChange('create', 'loans', result.id, {
+        member_name: selectedMember ? `${selectedMember.first_name} ${selectedMember.last_name}` : 'Unknown',
+        principal: principal,
+        interest_rate: Number(data.interestRate),
+        term_months: termMonths,
+        interest_type: data.interestType,
+        issue_date: data.issueDate,
+        due_date: dueDate
+      });
 
       toast({
         title: 'Success',

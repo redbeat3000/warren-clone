@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { auditLogger } from '@/utils/auditLogger';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -73,17 +74,30 @@ export default function AddFineForm({ onSuccess, onClose }: AddFineFormProps) {
 
   const onSubmit = async (data: FineFormData) => {
     try {
-      const { error } = await supabase
+      const fineData = {
+        member_id: data.memberId,
+        amount: Number(data.amount),
+        reason: data.reason,
+        fine_date: data.fineDate,
+        status: 'unpaid',
+      };
+
+      const { data: result, error } = await supabase
         .from('fines')
-        .insert({
-          member_id: data.memberId,
-          amount: Number(data.amount),
-          reason: data.reason,
-          fine_date: data.fineDate,
-          status: 'unpaid',
-        });
+        .insert(fineData)
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Log the fine creation
+      const selectedMember = members.find(m => m.id === data.memberId);
+      await auditLogger.logDataChange('create', 'fines', result.id, {
+        member_name: selectedMember ? `${selectedMember.first_name} ${selectedMember.last_name}` : 'Unknown',
+        amount: Number(data.amount),
+        reason: data.reason,
+        fine_date: data.fineDate
+      });
 
       toast({
         title: 'Success',
