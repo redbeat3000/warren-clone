@@ -10,9 +10,17 @@ import {
   DevicePhoneMobileIcon,
   ClockIcon
 } from '@heroicons/react/24/outline';
+import { useSettings, MemberManagementSettings } from '@/hooks/useSettings';
 
 export default function SettingsView() {
   const [activeTab, setActiveTab] = useState('general');
+  const { settings, loading, saveSettings } = useSettings();
+  const [localSettings, setLocalSettings] = useState<MemberManagementSettings>(settings);
+
+  // Update local settings when settings change
+  React.useEffect(() => {
+    setLocalSettings(settings);
+  }, [settings]);
 
   const settingsTabs = [
     { id: 'general', name: 'General', icon: Cog6ToothIcon },
@@ -203,7 +211,12 @@ export default function SettingsView() {
                         <p className="text-sm text-muted-foreground">New member applications need chairman approval</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" defaultChecked className="sr-only peer" />
+                        <input 
+                          type="checkbox" 
+                          checked={localSettings.memberApprovalRequired}
+                          onChange={(e) => setLocalSettings(prev => ({ ...prev, memberApprovalRequired: e.target.checked }))}
+                          className="sr-only peer" 
+                        />
                         <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                       </label>
                     </div>
@@ -214,7 +227,12 @@ export default function SettingsView() {
                         <p className="text-sm text-muted-foreground">Automatically generate sequential member numbers</p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" defaultChecked className="sr-only peer" />
+                        <input 
+                          type="checkbox" 
+                          checked={localSettings.autoAssignMemberNumbers}
+                          onChange={(e) => setLocalSettings(prev => ({ ...prev, autoAssignMemberNumbers: e.target.checked }))}
+                          className="sr-only peer" 
+                        />
                         <div className="w-11 h-6 bg-muted peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                       </label>
                     </div>
@@ -223,7 +241,8 @@ export default function SettingsView() {
                       <label className="block text-sm font-medium text-foreground mb-2">Member Number Prefix</label>
                       <input
                         type="text"
-                        defaultValue="CH"
+                        value={localSettings.memberNumberPrefix}
+                        onChange={(e) => setLocalSettings(prev => ({ ...prev, memberNumberPrefix: e.target.value }))}
                         className="w-full px-4 py-2 border border-input-border rounded-lg bg-input focus:outline-none focus:ring-2 focus:ring-accent-border"
                       />
                     </div>
@@ -232,7 +251,8 @@ export default function SettingsView() {
                       <label className="block text-sm font-medium text-foreground mb-2">Maximum Members</label>
                       <input
                         type="number"
-                        defaultValue="50"
+                        value={localSettings.maximumMembers}
+                        onChange={(e) => setLocalSettings(prev => ({ ...prev, maximumMembers: parseInt(e.target.value) || 50 }))}
                         className="w-full px-4 py-2 border border-input-border rounded-lg bg-input focus:outline-none focus:ring-2 focus:ring-accent-border"
                       />
                     </div>
@@ -340,8 +360,10 @@ export default function SettingsView() {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="btn-primary"
+                onClick={() => saveSettings(localSettings)}
+                disabled={loading}
               >
-                Save Changes
+                {loading ? 'Saving...' : 'Save Changes'}
               </motion.button>
             </div>
           </div>
