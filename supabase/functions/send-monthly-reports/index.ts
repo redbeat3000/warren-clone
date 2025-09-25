@@ -101,10 +101,14 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     let totalSent = 0;
-
-    // Send monthly report to each member
-    const emailPromises = members.map(async (member) => {
+    const results = [];
+    
+    // Send emails sequentially to respect rate limits (max 2 per second)
+    for (let i = 0; i < members.length; i++) {
+      const member = members[i];
       try {
+        console.log(`Sending monthly report to ${member.email} (${i + 1}/${members.length})`);
+        
         const emailResponse = await resend.emails.send({
           from: "Chama Management <onboarding@resend.dev>",
           to: [member.email],
@@ -186,18 +190,36 @@ const handler = async (req: Request): Promise<Response> => {
           `,
         });
 
-        console.log(`Monthly report sent to ${member.email}:`, emailResponse);
-        return { success: true, email: member.email };
+        console.log(`✅ Monthly report sent successfully to ${member.email}`);
+        results.push({ success: true, email: member.email, response: emailResponse });
+        totalSent++;
+        
       } catch (error: any) {
-        console.error(`Failed to send report to ${member.email}:`, error);
-        return { success: false, email: member.email, error: error.message };
+        console.error(`❌ Failed to send report to ${member.email}:`, error);
+        results.push({ 
+          success: false, 
+          email: member.email, 
+          error: error.message,
+          statusCode: error.statusCode || 'unknown'
+        });
       }
-    });
+      
+      // Add delay to respect rate limits (500ms = 2 requests per second max)
+      if (i < members.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 600));
+      }
+    }
 
-    const results = await Promise.all(emailPromises);
-    totalSent = results.filter(r => r.success).length;
-
-    console.log(`Monthly reports: ${totalSent}/${members.length} emails sent`);
+    console.log(`Monthly reports: ${totalSent}/${members.length} emails sent successfully`);
+    
+    // Count failed emails and their reasons
+    const failedResults = results.filter(r => !r.success);
+    if (failedResults.length > 0) {
+      console.log("Failed email details:");
+      failedResults.forEach(result => {
+        console.log(`- ${result.email}: ${result.error} (Status: ${result.statusCode})`);
+      });
+    }
 
     // Log the activity
     const { error: logError } = await supabase
@@ -210,7 +232,9 @@ const handler = async (req: Request): Promise<Response> => {
           total_loans: totalLoansIssued,
           total_expenses: totalExpenses,
           emails_sent: totalSent,
-          members_count: members.length
+          emails_failed: failedResults.length,
+          members_count: members.length,
+          failed_emails: failedResults.map(r => ({ email: r.email, error: r.error }))
         }
       });
 
@@ -220,9 +244,13 @@ const handler = async (req: Request): Promise<Response> => {
 
     return new Response(
       JSON.stringify({ 
-        message: `Monthly reports sent successfully for ${monthName}`,
+        message: totalSent === members.length 
+          ? `Monthly reports sent successfully to all ${totalSent} members for ${monthName}` 
+          : `Monthly reports sent to ${totalSent}/${members.length} members for ${monthName}. ${failedResults.length} emails failed.`,
         emails_sent: totalSent,
+        emails_failed: failedResults.length,
         members_notified: members.length,
+        failed_details: failedResults.length > 0 ? failedResults : undefined,
         report_data: {
           total_contributions: totalContributions,
           total_loans: totalLoansIssued,
