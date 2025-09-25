@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { useSettings } from '@/hooks/useSettings';
 
 const memberSchema = z.object({
   firstName: z.string().min(1, 'First name is required').max(50, 'First name must be less than 50 characters'),
@@ -29,6 +30,8 @@ interface AddMemberFormProps {
 
 export default function AddMemberForm({ onSuccess, onClose }: AddMemberFormProps) {
   const { toast } = useToast();
+  const { settings, loading: settingsLoading } = useSettings();
+  
   const form = useForm<MemberFormData>({
     resolver: zodResolver(memberSchema),
     defaultValues: {
@@ -43,6 +46,44 @@ export default function AddMemberForm({ onSuccess, onClose }: AddMemberFormProps
 
   const onSubmit = async (data: MemberFormData) => {
     try {
+      // Check member count limit
+      const { data: members, error: countError } = await supabase
+        .from('users')
+        .select('id', { count: 'exact' })
+        .eq('status', 'active');
+
+      if (countError) throw countError;
+
+      const currentCount = members?.length || 0;
+      if (currentCount >= settings.maximumMembers) {
+        toast({
+          title: 'Member Limit Reached',
+          description: `Cannot add more members. Maximum limit of ${settings.maximumMembers} members has been reached.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Check if trying to add another chairperson
+      if (data.role === 'chairperson') {
+        const { data: existingChairperson, error: checkError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('role', 'chairperson')
+          .eq('status', 'active');
+
+        if (checkError) throw checkError;
+
+        if (existingChairperson && existingChairperson.length > 0) {
+          toast({
+            title: 'Error',
+            description: 'Only one chairperson is allowed in the system',
+            variant: 'destructive',
+          });
+          return;
+        }
+      }
+
       const { error } = await supabase
         .from('users')
         .insert({
@@ -52,13 +93,18 @@ export default function AddMemberForm({ onSuccess, onClose }: AddMemberFormProps
           phone: data.phone,
           national_id: data.nationalId || null,
           role: data.role as any,
+          status: settings.memberApprovalRequired && data.role !== 'chairperson' ? 'pending' : 'active',
         });
 
       if (error) throw error;
 
+      const successMessage = settings.memberApprovalRequired && data.role !== 'chairperson'
+        ? 'Member application submitted for approval!'
+        : 'Member added successfully';
+
       toast({
         title: 'Success',
-        description: 'Member added successfully',
+        description: successMessage,
       });
 
       onSuccess();
@@ -185,7 +231,7 @@ export default function AddMemberForm({ onSuccess, onClose }: AddMemberFormProps
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={form.formState.isSubmitting}>
+            <Button type="submit" disabled={form.formState.isSubmitting || settingsLoading}>
               {form.formState.isSubmitting ? 'Adding...' : 'Add Member'}
             </Button>
           </div>
