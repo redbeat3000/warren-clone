@@ -563,7 +563,7 @@ export type Database = {
       loan_status: "active" | "repaid" | "overdue" | "defaulted" | "draft"
       message_channel: "sms" | "email" | "whatsapp"
       message_status: "queued" | "sent" | "delivered" | "failed"
-      record_status: "active" | "inactive"
+      record_status: "active" | "inactive" | "pending"
       user_role: "chairperson" | "treasurer" | "secretary" | "member" | "viewer"
     }
     CompositeTypes: {
@@ -695,7 +695,7 @@ export const Constants = {
       loan_status: ["active", "repaid", "overdue", "defaulted", "draft"],
       message_channel: ["sms", "email", "whatsapp"],
       message_status: ["queued", "sent", "delivered", "failed"],
-      record_status: ["active", "inactive"],
+      record_status: ["active", "inactive", "pending"],
       user_role: ["chairperson", "treasurer", "secretary", "member", "viewer"],
     },
   },

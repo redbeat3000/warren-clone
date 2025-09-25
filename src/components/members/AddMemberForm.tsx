@@ -99,7 +99,7 @@ export default function AddMemberForm({ onSuccess, onClose }: AddMemberFormProps
       if (error) throw error;
 
       const successMessage = settings.memberApprovalRequired && data.role !== 'chairperson'
-        ? 'Member application submitted for approval!'
+        ? 'Member application submitted for approval! Status set to pending.'
         : 'Member added successfully';
 
       toast({

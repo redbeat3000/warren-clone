@@ -7,12 +7,15 @@ import {
   PhoneIcon,
   EnvelopeIcon,
   EyeIcon,
-  PencilIcon
+  PencilIcon,
+  ClockIcon
 } from '@heroicons/react/24/outline';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import AddMemberForm from './AddMemberForm';
 import MemberDetailsDialog from './MemberDetailsDialog';
 import EditMemberDialog from './EditMemberDialog';
+import PendingMembersDialog from './PendingMembersDialog';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 
 // Sample member data
@@ -196,6 +199,7 @@ export default function MembersList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
+  const [isPendingMembersOpen, setIsPendingMembersOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [isMemberDetailsOpen, setIsMemberDetailsOpen] = useState(false);
@@ -203,6 +207,10 @@ export default function MembersList() {
   const [isEditMemberOpen, setIsEditMemberOpen] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingCount, setPendingCount] = useState(0);
+  const { authUser } = useAuth();
+
+  const isAdmin = authUser?.role && ['chairperson', 'treasurer', 'secretary'].includes(authUser.role);
 
   useEffect(() => {
     fetchMembers();
@@ -288,24 +296,43 @@ export default function MembersList() {
           <h1 className="text-3xl font-bold text-foreground">Members</h1>
           <p className="text-muted-foreground mt-1">Manage your Chama members and their information</p>
         </div>
-        <Dialog open={isAddMemberOpen} onOpenChange={setIsAddMemberOpen}>
-          <DialogTrigger asChild>
+        <div className="flex items-center space-x-3">
+          {/* Pending Approvals Button - Only for Admins */}
+          {isAdmin && pendingCount > 0 && (
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="btn-primary flex items-center space-x-2"
+              onClick={() => setIsPendingMembersOpen(true)}
+              className="btn-secondary flex items-center space-x-2 relative"
             >
-              <PlusIcon className="h-5 w-5" />
-              <span>Add Member</span>
+              <ClockIcon className="h-5 w-5" />
+              <span>Pending Approvals</span>
+              <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                {pendingCount}
+              </div>
             </motion.button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <AddMemberForm 
-              onSuccess={() => setRefreshKey(prev => prev + 1)} 
-              onClose={() => setIsAddMemberOpen(false)} 
-            />
-          </DialogContent>
-        </Dialog>
+          )}
+          
+          {/* Add Member Button */}
+          <Dialog open={isAddMemberOpen} onOpenChange={setIsAddMemberOpen}>
+            <DialogTrigger asChild>
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="btn-primary flex items-center space-x-2"
+              >
+                <PlusIcon className="h-5 w-5" />
+                <span>Add Member</span>
+              </motion.button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <AddMemberForm 
+                onSuccess={() => setRefreshKey(prev => prev + 1)} 
+                onClose={() => setIsAddMemberOpen(false)} 
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
       </motion.div>
 
       {/* Filters */}
@@ -398,6 +425,16 @@ export default function MembersList() {
         open={isEditMemberOpen}
         onClose={() => setIsEditMemberOpen(false)}
         onSuccess={() => {
+          fetchMembers();
+          setRefreshKey(prev => prev + 1);
+        }}
+      />
+
+      {/* Pending Members Dialog */}
+      <PendingMembersDialog
+        open={isPendingMembersOpen}
+        onClose={() => setIsPendingMembersOpen(false)}
+        onMemberApproved={() => {
           fetchMembers();
           setRefreshKey(prev => prev + 1);
         }}

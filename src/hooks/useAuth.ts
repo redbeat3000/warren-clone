@@ -10,7 +10,7 @@ interface AuthUser {
   last_name: string;
   full_name: string | null;
   role: 'chairperson' | 'treasurer' | 'secretary' | 'member' | 'viewer';
-  status: 'active' | 'inactive';
+  status: 'active' | 'inactive' | 'pending';
   photo_url: string | null;
 }
 
