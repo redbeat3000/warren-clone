@@ -17,6 +17,7 @@ const contributionSchema = z.object({
   amount: z.string().min(1, 'Amount is required').refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
     message: 'Amount must be a positive number',
   }),
+  contributionType: z.enum(['savings', 'land_fund', 'security', 'tea', 'xmas']),
   paymentMethod: z.string().optional(),
   receiptNo: z.string().optional(),
   notes: z.string().optional(),
@@ -47,6 +48,7 @@ export default function AddContributionForm({ onSuccess, onClose }: AddContribut
     defaultValues: {
       memberId: '',
       amount: '',
+      contributionType: 'savings',
       paymentMethod: 'M-Pesa',
       receiptNo: '',
       notes: '',
@@ -84,6 +86,7 @@ export default function AddContributionForm({ onSuccess, onClose }: AddContribut
       const contributionData = {
         member_id: data.memberId,
         amount: Number(data.amount),
+        contribution_type: data.contributionType,
         payment_method: data.paymentMethod || null,
         receipt_no: data.receiptNo || null,
         notes: data.notes || null,
@@ -173,13 +176,38 @@ export default function AddContributionForm({ onSuccess, onClose }: AddContribut
                     <Input placeholder="Enter amount" type="number" {...field} />
                   </FormControl>
                   <FormMessage />
-                </FormItem>
-              )}
-            />
+              </FormItem>
+            )}
+          />
 
-            <FormField
-              control={form.control}
-              name="contributionDate"
+          <FormField
+            control={form.control}
+            name="contributionType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Contribution Type</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select contribution type" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="savings">Savings</SelectItem>
+                    <SelectItem value="land_fund">Land Fund</SelectItem>
+                    <SelectItem value="security">Security</SelectItem>
+                    <SelectItem value="tea">Tea</SelectItem>
+                    <SelectItem value="xmas">Christmas</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={form.control}
+            name="contributionDate"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Date</FormLabel>

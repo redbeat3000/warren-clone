@@ -102,6 +102,7 @@ export default function ContributionsView() {
         memberName: `${contrib.users.first_name} ${contrib.users.last_name}`,
         memberNo: contrib.users.member_no || 'N/A',
         amount: contrib.amount,
+        contributionType: contrib.contribution_type || 'savings',
         date: contrib.contribution_date,
         paymentMethod: contrib.payment_method || 'N/A',
         status: 'confirmed'
@@ -119,6 +120,10 @@ export default function ContributionsView() {
   const totalContributions = activeContributions.reduce((sum, contrib) => sum + contrib.amount, 0);
   const monthlyTarget = 50000;
   const targetProgress = (totalContributions / monthlyTarget) * 100;
+  
+  // Count unique members who contributed
+  const uniqueMembers = new Set(activeContributions.map(c => c.memberNo));
+  const contributorCount = uniqueMembers.size;
 
   const filteredContributions = activeContributions.filter(contrib => 
     filter === 'all' || contrib.status === filter
@@ -214,8 +219,8 @@ export default function ContributionsView() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Contributors</p>
-              <p className="text-2xl font-bold text-foreground mt-2">{activeContributions.length}</p>
-              <p className="text-sm text-success mt-2">{activeContributions.length} members contributed</p>
+              <p className="text-2xl font-bold text-foreground mt-2">{contributorCount}</p>
+              <p className="text-sm text-success mt-2">{activeContributions.length} total contributions</p>
             </div>
             <div className="h-12 w-12 bg-success/10 rounded-lg flex items-center justify-center">
               <CalendarDaysIcon className="h-6 w-6 text-success" />
@@ -285,6 +290,9 @@ export default function ContributionsView() {
                   Member
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Type
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Amount
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -318,6 +326,19 @@ export default function ContributionsView() {
                       <div className="text-sm font-medium text-foreground">{contribution.memberName}</div>
                       <div className="text-sm text-muted-foreground">{contribution.memberNo}</div>
                     </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                      contribution.contributionType === 'savings' ? 'bg-primary/10 text-primary' :
+                      contribution.contributionType === 'land_fund' ? 'bg-success/10 text-success' :
+                      contribution.contributionType === 'security' ? 'bg-warning/10 text-warning' :
+                      contribution.contributionType === 'tea' ? 'bg-accent/10 text-accent' :
+                      'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                    }`}>
+                      {contribution.contributionType === 'land_fund' ? 'Land Fund' :
+                       contribution.contributionType === 'xmas' ? 'Christmas' :
+                       contribution.contributionType?.charAt(0).toUpperCase() + contribution.contributionType?.slice(1)}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-foreground">KES {contribution.amount.toLocaleString()}</div>

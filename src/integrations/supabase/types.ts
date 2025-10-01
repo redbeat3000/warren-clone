@@ -57,6 +57,7 @@ export type Database = {
         Row: {
           amount: number
           contribution_date: string
+          contribution_type: string | null
           created_at: string
           created_by: string | null
           id: string
@@ -68,6 +69,7 @@ export type Database = {
         Insert: {
           amount: number
           contribution_date?: string
+          contribution_type?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -79,6 +81,7 @@ export type Database = {
         Update: {
           amount?: number
           contribution_date?: string
+          contribution_type?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -531,6 +534,7 @@ export type Database = {
           member_id: string | null
           message_content: string | null
           provider_response: Json | null
+          scheduled_for: string | null
           sent_at: string | null
           status: Database["public"]["Enums"]["message_status"]
         }
@@ -541,6 +545,7 @@ export type Database = {
           member_id?: string | null
           message_content?: string | null
           provider_response?: Json | null
+          scheduled_for?: string | null
           sent_at?: string | null
           status?: Database["public"]["Enums"]["message_status"]
         }
@@ -551,6 +556,7 @@ export type Database = {
           member_id?: string | null
           message_content?: string | null
           provider_response?: Json | null
+          scheduled_for?: string | null
           sent_at?: string | null
           status?: Database["public"]["Enums"]["message_status"]
         }

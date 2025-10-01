@@ -2,7 +2,10 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { UserCircleIcon, PhoneIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
+import { Button } from '@/components/ui/button';
+import { UserCircleIcon, PhoneIcon, EnvelopeIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import { supabase } from '@/integrations/supabase/client';
+import { generateMemberReportPDF } from '@/utils/pdfGenerator';
 
 interface Member {
   id: string;
@@ -26,6 +29,50 @@ interface MemberDetailsDialogProps {
 
 export default function MemberDetailsDialog({ member, open, onClose }: MemberDetailsDialogProps) {
   if (!member) return null;
+
+  const handleDownloadReport = async () => {
+    try {
+      // Fetch all member data
+      const [contributions, fines, loans, repayments] = await Promise.all([
+        supabase.from('contributions').select('*').eq('member_id', member.id),
+        supabase.from('fines').select('*').eq('member_id', member.id),
+        supabase.from('loans').select('*, loan_repayments(*)').eq('member_id', member.id),
+        supabase.from('loan_repayments').select('*').eq('member_id', member.id)
+      ]);
+
+      // Group contributions by type
+      const contributionsByType = (contributions.data || []).reduce((acc: any, c: any) => {
+        const type = c.contribution_type || 'savings';
+        if (!acc[type]) acc[type] = 0;
+        acc[type] += parseFloat(c.amount);
+        return acc;
+      }, {});
+
+      const memberData = {
+        ...member,
+        firstName: member.firstName || '',
+        lastName: member.lastName || '',
+        memberNo: member.memberNo || 'N/A',
+        email: member.email || 'N/A',
+        phone: member.phone || 'N/A',
+        status: member.status || 'active',
+        role: member.role || 'member',
+        joinDate: member.joinDate || new Date().toISOString()
+      };
+
+      const financialData = {
+        contributions: contributionsByType,
+        totalContributions: member.totalContributions || 0,
+        fines: fines.data || [],
+        loans: loans.data || [],
+        repayments: repayments.data || []
+      };
+
+      generateMemberReportPDF(memberData, financialData);
+    } catch (error) {
+      console.error('Error generating member report:', error);
+    }
+  };
 
   const statusColors = {
     active: 'bg-success text-success-foreground',
@@ -116,6 +163,13 @@ export default function MemberDetailsDialog({ member, open, onClose }: MemberDet
                 {new Date(member.joinDate).toLocaleDateString()}
               </p>
             </div>
+          </div>
+
+          <div className="mt-6 flex justify-end">
+            <Button onClick={handleDownloadReport} className="w-full">
+              <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
+              Download Details (PDF)
+            </Button>
           </div>
         </motion.div>
       </DialogContent>

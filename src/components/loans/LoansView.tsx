@@ -11,7 +11,9 @@ import {
 } from '@heroicons/react/24/outline';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import AddLoanForm from './AddLoanForm';
+import LoanRepaymentDialog from './LoanRepaymentDialog';
 import { supabase } from '@/integrations/supabase/client';
+import { generateLoansReportPDF } from '@/utils/pdfGenerator';
 
 // Sample loans data
 const sampleLoans = [
@@ -62,6 +64,8 @@ const sampleLoans = [
 export default function LoansView() {
   const [filter, setFilter] = useState('all');
   const [isAddLoanOpen, setIsAddLoanOpen] = useState(false);
+  const [selectedLoan, setSelectedLoan] = useState<any>(null);
+  const [isRepaymentOpen, setIsRepaymentOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [loans, setLoans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,25 +98,55 @@ export default function LoansView() {
     try {
       const { data, error } = await supabase
         .from('loans')
-        .select('*, users!inner(first_name, last_name, member_no)')
+        .select('*, users!inner(first_name, last_name, member_no), loan_repayments(amount)')
         .order('issue_date', { ascending: false });
 
       if (error) throw error;
 
-      const formattedLoans = (data || []).map((loan: any) => ({
-        id: loan.id,
-        loanNo: `LN${loan.id.slice(-3)}`,
-        memberName: `${loan.users.first_name} ${loan.users.last_name}`,
-        memberNo: loan.users.member_no || 'N/A',
-        principal: loan.principal,
-        interestRate: loan.interest_rate,
-        term: loan.term_months,
-        issueDate: loan.issue_date,
-        balance: loan.principal, // TODO: Calculate actual balance
-        monthlyPayment: Math.round(loan.principal / loan.term_months),
-        nextPayment: loan.due_date,
-        status: loan.status
-      }));
+      const formattedLoans = (data || []).map((loan: any) => {
+        // Calculate total repayments
+        const totalRepayments = loan.loan_repayments?.reduce(
+          (sum: number, repayment: any) => sum + parseFloat(repayment.amount),
+          0
+        ) || 0;
+
+        const principal = parseFloat(loan.principal);
+        const interestRate = parseFloat(loan.interest_rate);
+        const termMonths = loan.term_months;
+        
+        // Calculate interest based on interest type
+        let totalInterest = 0;
+        if (loan.interest_type === 'flat') {
+          totalInterest = (principal * interestRate * termMonths) / (100 * 12);
+        } else { // declining balance
+          const monthlyRate = interestRate / 100 / 12;
+          const totalPayment = principal * (monthlyRate * Math.pow(1 + monthlyRate, termMonths)) / (Math.pow(1 + monthlyRate, termMonths) - 1);
+          totalInterest = (totalPayment * termMonths) - principal;
+        }
+
+        const totalAmount = principal + totalInterest;
+        const outstandingBalance = totalAmount - totalRepayments;
+
+        // Check if loan is overdue
+        const isOverdue = loan.status === 'active' && loan.due_date && new Date(loan.due_date) < new Date();
+
+        return {
+          id: loan.id,
+          loanNo: `LN${loan.id.slice(-3)}`,
+          memberName: `${loan.users.first_name} ${loan.users.last_name}`,
+          memberNo: loan.users.member_no || 'N/A',
+          principal: principal,
+          interestRate: interestRate,
+          term: termMonths,
+          issueDate: loan.issue_date,
+          balance: outstandingBalance,
+          monthlyPayment: Math.round(totalAmount / termMonths),
+          nextPayment: loan.due_date,
+          status: isOverdue ? 'overdue' : loan.status,
+          interestType: loan.interest_type,
+          outstandingBalance: outstandingBalance
+        };
+      });
 
       setLoans(formattedLoans);
     } catch (error) {
@@ -125,7 +159,7 @@ export default function LoansView() {
   const activeLoans = loans.length > 0 ? loans : sampleLoans;
   const totalLoaned = activeLoans.reduce((sum, loan) => sum + loan.principal, 0);
   const totalOutstanding = activeLoans.reduce((sum, loan) => sum + loan.balance, 0);
-  const activeLoanCount = activeLoans.filter(loan => loan.status === 'active').length;
+  const activeLoanCount = activeLoans.filter(loan => loan.status === 'active' || loan.status === 'overdue').length;
   const overdueLoans = activeLoans.filter(loan => loan.status === 'overdue').length;
 
   const filteredLoans = activeLoans.filter(loan => 
@@ -133,7 +167,6 @@ export default function LoansView() {
   );
 
   const handleExportLoans = async () => {
-    const { generateLoansReportPDF } = await import('@/utils/pdfGenerator');
     generateLoansReportPDF(filteredLoans);
   };
 
@@ -355,7 +388,14 @@ export default function LoansView() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
-                      <button className="p-1 hover:bg-secondary rounded transition-colors">
+                      <button 
+                        className="p-1 hover:bg-secondary rounded transition-colors"
+                        onClick={() => {
+                          setSelectedLoan(loan);
+                          setIsRepaymentOpen(true);
+                        }}
+                        title="Record Repayment"
+                      >
                         <EyeIcon className="h-4 w-4 text-muted-foreground" />
                       </button>
                     </div>
@@ -366,6 +406,16 @@ export default function LoansView() {
           </table>
         </div>
       </motion.div>
+
+      <LoanRepaymentDialog
+        loan={selectedLoan}
+        open={isRepaymentOpen}
+        onClose={() => {
+          setIsRepaymentOpen(false);
+          setSelectedLoan(null);
+        }}
+        onSuccess={fetchLoans}
+      />
     </div>
   );
 }
