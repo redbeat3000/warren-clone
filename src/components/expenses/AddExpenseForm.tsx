@@ -86,7 +86,10 @@ export default function AddExpenseForm({ onSuccess, onClose }: AddExpenseFormPro
   };
 
   const expenseCategories = [
-    'Meeting Refreshments',
+    'Land Fund',
+    'Security',
+    'Refreshments',
+    'Christmas',
     'Bank Charges',
     'Office Supplies',
     'Legal Fees',
