@@ -6,10 +6,14 @@ import {
   CalendarDaysIcon,
   CurrencyDollarIcon,
   EyeIcon,
-  DocumentArrowDownIcon
+  DocumentArrowDownIcon,
+  PrinterIcon,
+  BanknotesIcon
 } from '@heroicons/react/24/outline';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import AddFineForm from './AddFineForm';
+import FineRepaymentDialog from './FineRepaymentDialog';
+import ViewDetailsDialog from '../common/ViewDetailsDialog';
 import { supabase } from '@/integrations/supabase/client';
 
 // Sample fines data
@@ -55,6 +59,9 @@ export default function FinesView() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [fines, setFines] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedFine, setSelectedFine] = useState<any>(null);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [isRepaymentOpen, setIsRepaymentOpen] = useState(false);
 
   useEffect(() => {
     fetchFines();
@@ -122,6 +129,26 @@ export default function FinesView() {
   const handleExportFines = async () => {
     const { generateFinesReportPDF } = await import('@/utils/pdfGenerator');
     generateFinesReportPDF(filteredFines);
+  };
+
+  const handleViewFine = (fine: any) => {
+    setSelectedFine(fine);
+    setIsViewOpen(true);
+  };
+
+  const handleRepayFine = (fine: any) => {
+    setSelectedFine({
+      id: fine.id,
+      memberName: fine.memberName,
+      reason: fine.reason,
+      amount: fine.amount
+    });
+    setIsRepaymentOpen(true);
+  };
+
+  const handlePrintFine = async (fine: any) => {
+    const { generateFinesReportPDF } = await import('@/utils/pdfGenerator');
+    generateFinesReportPDF([fine]);
   };
 
   return (
@@ -335,9 +362,29 @@ export default function FinesView() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
-                      <button className="p-1 hover:bg-secondary rounded transition-colors">
+                      <button 
+                        className="p-1 hover:bg-secondary rounded transition-colors"
+                        onClick={() => handleViewFine(fine)}
+                        title="View Details"
+                      >
                         <EyeIcon className="h-4 w-4 text-muted-foreground" />
                       </button>
+                      <button 
+                        className="p-1 hover:bg-secondary rounded transition-colors"
+                        onClick={() => handlePrintFine(fine)}
+                        title="Print"
+                      >
+                        <PrinterIcon className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                      {fine.status !== 'paid' && (
+                        <button 
+                          className="p-1 hover:bg-success/10 rounded transition-colors"
+                          onClick={() => handleRepayFine(fine)}
+                          title="Record Repayment"
+                        >
+                          <BanknotesIcon className="h-4 w-4 text-success" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </motion.tr>
@@ -346,6 +393,73 @@ export default function FinesView() {
           </table>
         </div>
       </motion.div>
+
+      {/* View Fine Details Dialog */}
+      <ViewDetailsDialog
+        open={isViewOpen}
+        onClose={() => setIsViewOpen(false)}
+        title="Fine Details"
+        onPrint={() => selectedFine && handlePrintFine(selectedFine)}
+      >
+        {selectedFine && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Fine Number</p>
+                <p className="font-medium">{selectedFine.fineNo}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Status</p>
+                <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                  selectedFine.status === 'paid' 
+                    ? 'status-active' 
+                    : selectedFine.status === 'pending'
+                    ? 'status-pending'
+                    : 'status-overdue'
+                }`}>
+                  {selectedFine.status}
+                </span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Member</p>
+                <p className="font-medium">{selectedFine.memberName}</p>
+                <p className="text-sm text-muted-foreground">{selectedFine.memberNo}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Amount</p>
+                <p className="text-lg font-bold text-primary">KES {selectedFine.amount.toLocaleString()}</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Reason</p>
+              <p className="font-medium">{selectedFine.reason}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Due Date</p>
+                <p className="font-medium">{new Date(selectedFine.dueDate).toLocaleDateString()}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Date Issued</p>
+                <p className="font-medium">{new Date(selectedFine.dateIssued).toLocaleDateString()}</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </ViewDetailsDialog>
+
+      {/* Fine Repayment Dialog */}
+      <FineRepaymentDialog
+        fine={selectedFine}
+        open={isRepaymentOpen}
+        onClose={() => setIsRepaymentOpen(false)}
+        onSuccess={() => {
+          fetchFines();
+          setRefreshKey(prev => prev + 1);
+        }}
+      />
     </div>
   );
 }

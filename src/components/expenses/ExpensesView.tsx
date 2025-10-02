@@ -7,10 +7,12 @@ import {
   CurrencyDollarIcon,
   EyeIcon,
   DocumentTextIcon,
-  DocumentArrowDownIcon
+  DocumentArrowDownIcon,
+  PrinterIcon
 } from '@heroicons/react/24/outline';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import AddExpenseForm from './AddExpenseForm';
+import ViewDetailsDialog from '../common/ViewDetailsDialog';
 import { supabase } from '@/integrations/supabase/client';
 
 // Sample expenses data
@@ -77,6 +79,8 @@ export default function ExpensesView() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [expenses, setExpenses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedExpense, setSelectedExpense] = useState<any>(null);
+  const [isViewOpen, setIsViewOpen] = useState(false);
 
   useEffect(() => {
     fetchExpenses();
@@ -146,6 +150,16 @@ export default function ExpensesView() {
   const handleExportExpenses = async () => {
     const { generateExpensesReportPDF } = await import('@/utils/pdfGenerator');
     generateExpensesReportPDF(filteredExpenses);
+  };
+
+  const handleViewExpense = (expense: any) => {
+    setSelectedExpense(expense);
+    setIsViewOpen(true);
+  };
+
+  const handlePrintExpense = async (expense: any) => {
+    const { generateExpensesReportPDF } = await import('@/utils/pdfGenerator');
+    generateExpensesReportPDF([expense]);
   };
 
   // Group expenses by category
@@ -386,8 +400,19 @@ export default function ExpensesView() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
-                      <button className="p-1 hover:bg-secondary rounded transition-colors">
+                      <button 
+                        className="p-1 hover:bg-secondary rounded transition-colors"
+                        onClick={() => handleViewExpense(expense)}
+                        title="View Details"
+                      >
                         <EyeIcon className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                      <button 
+                        className="p-1 hover:bg-secondary rounded transition-colors"
+                        onClick={() => handlePrintExpense(expense)}
+                        title="Print"
+                      >
+                        <PrinterIcon className="h-4 w-4 text-muted-foreground" />
                       </button>
                     </div>
                   </td>
@@ -397,6 +422,72 @@ export default function ExpensesView() {
           </table>
         </div>
       </motion.div>
+
+      {/* View Expense Details Dialog */}
+      <ViewDetailsDialog
+        open={isViewOpen}
+        onClose={() => setIsViewOpen(false)}
+        title="Expense Details"
+        onPrint={() => selectedExpense && handlePrintExpense(selectedExpense)}
+      >
+        {selectedExpense && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Expense Number</p>
+                <p className="font-medium">{selectedExpense.expenseNo}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Status</p>
+                <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                  selectedExpense.status === 'approved' 
+                    ? 'status-active' 
+                    : 'status-pending'
+                }`}>
+                  {selectedExpense.status}
+                </span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Category</p>
+                <p className="font-medium">{selectedExpense.category}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Amount</p>
+                <p className="text-lg font-bold text-primary">KES {selectedExpense.amount.toLocaleString()}</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Description</p>
+              <p className="font-medium">{selectedExpense.description}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Expense Date</p>
+                <p className="font-medium">{new Date(selectedExpense.date).toLocaleDateString()}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Approved By</p>
+                <p className="font-medium">{selectedExpense.approvedBy}</p>
+              </div>
+            </div>
+            {selectedExpense.receiptUrl && (
+              <div>
+                <p className="text-sm text-muted-foreground">Receipt</p>
+                <a 
+                  href={selectedExpense.receiptUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  View Receipt
+                </a>
+              </div>
+            )}
+          </div>
+        )}
+      </ViewDetailsDialog>
     </div>
   );
 }
