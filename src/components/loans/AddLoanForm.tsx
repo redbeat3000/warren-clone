@@ -51,7 +51,7 @@ export default function AddLoanForm({ onSuccess, onClose }: AddLoanFormProps) {
     defaultValues: {
       memberId: '',
       principal: '',
-      interestRate: '10',
+      interestRate: '1.5',
       termMonths: '12',
       interestType: 'declining',
       issueDate: new Date().toISOString().split('T')[0],
