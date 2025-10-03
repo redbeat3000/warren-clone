@@ -258,6 +258,27 @@ export default function MembersList() {
 
       if (error) throw error;
 
+      // Fetch contributions and loans for all members
+      const [contributionsRes, loansRes] = await Promise.all([
+        supabase.from('contributions').select('member_id, amount'),
+        supabase.from('loans').select('member_id, status')
+      ]);
+
+      // Calculate totals per member
+      const contributionsByMember = (contributionsRes.data || []).reduce((acc: any, c: any) => {
+        if (!acc[c.member_id]) acc[c.member_id] = 0;
+        acc[c.member_id] += parseFloat(c.amount || 0);
+        return acc;
+      }, {});
+
+      const loansByMember = (loansRes.data || []).reduce((acc: any, l: any) => {
+        if (l.status === 'active') {
+          if (!acc[l.member_id]) acc[l.member_id] = 0;
+          acc[l.member_id] += 1;
+        }
+        return acc;
+      }, {});
+
       const formattedMembers: Member[] = (data || []).map((user: any) => ({
         id: user.id,
         memberNo: user.member_no || 'N/A',
@@ -268,8 +289,8 @@ export default function MembersList() {
         joinDate: user.join_date || user.created_at,
         status: user.status,
         role: user.role,
-        totalContributions: 0, // Will be calculated from contributions table
-        activeLoans: 0 // Will be calculated from loans table
+        totalContributions: contributionsByMember[user.id] || 0,
+        activeLoans: loansByMember[user.id] || 0
       }));
 
       setMembers(formattedMembers);
