@@ -33,11 +33,12 @@ export default function MemberDetailsDialog({ member, open, onClose }: MemberDet
   const handleDownloadReport = async () => {
     try {
       // Fetch all member data
-      const [contributions, fines, loans, repayments] = await Promise.all([
+      const [contributions, fines, loans, repayments, dividends] = await Promise.all([
         supabase.from('contributions').select('*').eq('member_id', member.id),
         supabase.from('fines').select('*').eq('member_id', member.id),
         supabase.from('loans').select('*, loan_repayments(*)').eq('member_id', member.id),
-        supabase.from('loan_repayments').select('*').eq('member_id', member.id)
+        supabase.from('loan_repayments').select('*').eq('member_id', member.id),
+        supabase.from('dividends').select('*').eq('member_id', member.id)
       ]);
 
       // Group contributions by type
@@ -65,7 +66,8 @@ export default function MemberDetailsDialog({ member, open, onClose }: MemberDet
         totalContributions: member.totalContributions || 0,
         fines: fines.data || [],
         loans: loans.data || [],
-        repayments: repayments.data || []
+        repayments: repayments.data || [],
+        dividends: dividends.data || []
       };
 
       generateMemberReportPDF(memberData, financialData);
