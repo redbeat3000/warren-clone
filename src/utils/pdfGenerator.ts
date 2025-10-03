@@ -1,16 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-// Extend jsPDF type to include autoTable
-declare module 'jspdf' {
-  interface jsPDF {
-    autoTable: (options: any) => jsPDF;
-    lastAutoTable: {
-      finalY: number;
-    };
-  }
-}
-
 interface PDFOptions {
   title: string;
   subtitle?: string;
@@ -78,7 +68,7 @@ export class PDFGenerator {
       ['Join Date', member.joinDate]
     ];
 
-    this.doc.autoTable({
+    autoTable(this.doc, {
       startY: this.currentY,
       head: [['Field', 'Value']],
       body: memberInfo,
@@ -87,7 +77,7 @@ export class PDFGenerator {
       margin: { left: this.margin, right: this.margin }
     });
 
-    this.currentY = this.doc.lastAutoTable.finalY + 20;
+    this.currentY = (this.doc as any).lastAutoTable.finalY + 20;
     this.checkPageBreak();
 
     // Financial Summary
@@ -99,17 +89,19 @@ export class PDFGenerator {
     const totalContributions = data.contributions.reduce((sum: number, c: any) => sum + parseFloat(c.amount?.toString() || '0'), 0);
     const totalFines = data.fines.reduce((sum: number, f: any) => sum + parseFloat(f.amount?.toString() || '0'), 0);
     const totalLoans = data.loans.reduce((sum: number, l: any) => sum + parseFloat(l.principal?.toString() || '0'), 0);
-    const meetingsAttended = data.meetingAttendance.filter((a: any) => a.status === 'present').length;
-    const totalMeetings = data.meetingAttendance.length;
+    const totalDividends = data.dividends?.reduce((sum: number, d: any) => sum + parseFloat(d.allocation_amount?.toString() || '0'), 0) || 0;
+    const meetingsAttended = data.meetingAttendance?.filter((a: any) => a.status === 'present').length || 0;
+    const totalMeetings = data.meetingAttendance?.length || 0;
 
     const financialSummary = [
       ['Total Contributions', `KES ${totalContributions.toLocaleString()}`],
       ['Total Fines', `KES ${totalFines.toLocaleString()}`],
       ['Total Loans', `KES ${totalLoans.toLocaleString()}`],
+      ['Total Dividends', `KES ${totalDividends.toLocaleString()}`],
       ['Meetings Attended', `${meetingsAttended}/${totalMeetings}`]
     ];
 
-    this.doc.autoTable({
+    autoTable(this.doc, {
       startY: this.currentY,
       head: [['Metric', 'Value']],
       body: financialSummary,
@@ -118,7 +110,7 @@ export class PDFGenerator {
       margin: { left: this.margin, right: this.margin }
     });
 
-    this.currentY = this.doc.lastAutoTable.finalY + 20;
+    this.currentY = (this.doc as any).lastAutoTable.finalY + 20;
     this.checkPageBreak();
 
     // Contributions Section
@@ -130,15 +122,16 @@ export class PDFGenerator {
 
       const contributionsData = data.contributions.map((c: any) => [
         c.contribution_date,
+        c.contribution_type || 'N/A',
         `KES ${parseFloat(c.amount?.toString() || '0').toLocaleString()}`,
         c.payment_method || 'N/A',
         c.receipt_no || 'N/A',
         c.notes || 'N/A'
       ]);
 
-      this.doc.autoTable({
+      autoTable(this.doc, {
         startY: this.currentY,
-        head: [['Date', 'Amount', 'Method', 'Receipt No', 'Notes']],
+        head: [['Date', 'Type', 'Amount', 'Method', 'Receipt No', 'Notes']],
         body: contributionsData,
         theme: 'striped',
         headStyles: { fillColor: [52, 152, 219] },
@@ -146,7 +139,7 @@ export class PDFGenerator {
         styles: { fontSize: 8 }
       });
 
-      this.currentY = this.doc.lastAutoTable.finalY + 20;
+      this.currentY = (this.doc as any).lastAutoTable.finalY + 20;
       this.checkPageBreak();
     }
 
@@ -164,7 +157,7 @@ export class PDFGenerator {
         f.status
       ]);
 
-      this.doc.autoTable({
+      autoTable(this.doc, {
         startY: this.currentY,
         head: [['Date', 'Amount', 'Reason', 'Status']],
         body: finesData,
@@ -173,7 +166,7 @@ export class PDFGenerator {
         margin: { left: this.margin, right: this.margin }
       });
 
-      this.currentY = this.doc.lastAutoTable.finalY + 20;
+      this.currentY = (this.doc as any).lastAutoTable.finalY + 20;
       this.checkPageBreak();
     }
 
@@ -194,7 +187,7 @@ export class PDFGenerator {
         l.notes || 'N/A'
       ]);
 
-      this.doc.autoTable({
+      autoTable(this.doc, {
         startY: this.currentY,
         head: [['Issue Date', 'Principal', 'Rate', 'Term', 'Due Date', 'Status', 'Notes']],
         body: loansData,
@@ -204,12 +197,39 @@ export class PDFGenerator {
         styles: { fontSize: 8 }
       });
 
-      this.currentY = this.doc.lastAutoTable.finalY + 20;
+      this.currentY = (this.doc as any).lastAutoTable.finalY + 20;
+      this.checkPageBreak();
+    }
+
+    // Dividends Section
+    if (data.dividends && data.dividends.length > 0) {
+      this.doc.setFontSize(14);
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.text('Dividends History', this.margin, this.currentY);
+      this.currentY += 10;
+
+      const dividendsData = data.dividends.map((d: any) => [
+        d.period,
+        `KES ${parseFloat(d.allocation_amount?.toString() || '0').toLocaleString()}`,
+        d.payout_date || 'Pending',
+        d.created_at ? new Date(d.created_at).toLocaleDateString() : 'N/A'
+      ]);
+
+      autoTable(this.doc, {
+        startY: this.currentY,
+        head: [['Period', 'Amount', 'Payout Date', 'Recorded On']],
+        body: dividendsData,
+        theme: 'striped',
+        headStyles: { fillColor: [155, 89, 182] },
+        margin: { left: this.margin, right: this.margin }
+      });
+
+      this.currentY = (this.doc as any).lastAutoTable.finalY + 20;
       this.checkPageBreak();
     }
 
     // Meeting Attendance Section
-    if (data.meetingAttendance.length > 0) {
+    if (data.meetingAttendance && data.meetingAttendance.length > 0) {
       this.doc.setFontSize(14);
       this.doc.setFont('helvetica', 'bold');
       this.doc.text('Meeting Attendance', this.margin, this.currentY);
@@ -222,7 +242,7 @@ export class PDFGenerator {
         a.notes || 'N/A'
       ]);
 
-      this.doc.autoTable({
+      autoTable(this.doc, {
         startY: this.currentY,
         head: [['Meeting', 'Date', 'Status', 'Notes']],
         body: attendanceData,
@@ -254,7 +274,7 @@ export class PDFGenerator {
       })
     );
 
-    this.doc.autoTable({
+    autoTable(this.doc, {
       startY: this.currentY,
       head: [headers],
       body: rows,
@@ -290,7 +310,7 @@ export class PDFGenerator {
       ['Average Contribution', `KES ${Math.round(totalAmount / contributions.length).toLocaleString()}`]
     ];
 
-    this.doc.autoTable({
+    autoTable(this.doc, {
       startY: this.currentY,
       head: [['Metric', 'Value']],
       body: summaryData,
@@ -299,7 +319,7 @@ export class PDFGenerator {
       margin: { left: this.margin, right: this.margin }
     });
 
-    this.currentY = this.doc.lastAutoTable.finalY + 20;
+    this.currentY = (this.doc as any).lastAutoTable.finalY + 20;
 
     // Detailed contributions
     this.doc.setFontSize(12);
@@ -317,7 +337,7 @@ export class PDFGenerator {
       c.status
     ]);
 
-    this.doc.autoTable({
+    autoTable(this.doc, {
       startY: this.currentY,
       head: [['Receipt', 'Member', 'Member No', 'Amount', 'Date', 'Method', 'Status']],
       body: contributionsData,
@@ -386,7 +406,7 @@ export const generateLoansReportPDF = (loans: any[]) => {
     ['Total Loans', loans.length.toString()]
   ];
 
-  generator.doc.autoTable({
+  autoTable(generator.doc, {
     startY: generator.currentY,
     head: [['Metric', 'Value']],
     body: summaryData,
@@ -395,7 +415,7 @@ export const generateLoansReportPDF = (loans: any[]) => {
     margin: { left: generator.margin, right: generator.margin }
   });
 
-  generator.currentY = generator.doc.lastAutoTable.finalY + 20;
+  generator.currentY = (generator.doc as any).lastAutoTable.finalY + 20;
   generator.checkPageBreak();
 
   // Detailed loans
@@ -409,7 +429,7 @@ export const generateLoansReportPDF = (loans: any[]) => {
     l.status || 'N/A'
   ]);
 
-  generator.doc.autoTable({
+  autoTable(generator.doc, {
     startY: generator.currentY,
     head: [['Loan No', 'Member', 'Principal', 'Balance', 'Rate', 'Term', 'Status']],
     body: loansData,
@@ -432,7 +452,7 @@ export const generateExpensesReportPDF = (expenses: any[]) => {
     return;
   }
 
-  // Summary stats
+  // Summary stats and rest of implementation
   const totalExpenses = expenses.reduce((sum, e) => sum + parseFloat(e.amount?.toString() || '0'), 0);
   const approvedExpenses = expenses.filter(e => e.status === 'approved').length;
   const categories = [...new Set(expenses.map(e => e.category))];
@@ -444,7 +464,7 @@ export const generateExpensesReportPDF = (expenses: any[]) => {
     ['Total Entries', expenses.length.toString()]
   ];
 
-  generator.doc.autoTable({
+  autoTable(generator.doc, {
     startY: generator.currentY,
     head: [['Metric', 'Value']],
     body: summaryData,
@@ -453,10 +473,9 @@ export const generateExpensesReportPDF = (expenses: any[]) => {
     margin: { left: generator.margin, right: generator.margin }
   });
 
-  generator.currentY = generator.doc.lastAutoTable.finalY + 20;
+  generator.currentY = (generator.doc as any).lastAutoTable.finalY + 20;
   generator.checkPageBreak();
 
-  // Detailed expenses
   const expensesData = expenses.map(e => [
     e.expenseNo || 'N/A',
     e.category || 'N/A',
@@ -466,7 +485,7 @@ export const generateExpensesReportPDF = (expenses: any[]) => {
     e.status || 'N/A'
   ]);
 
-  generator.doc.autoTable({
+  autoTable(generator.doc, {
     startY: generator.currentY,
     head: [['Expense No', 'Category', 'Description', 'Amount', 'Date', 'Status']],
     body: expensesData,
@@ -489,7 +508,7 @@ export const generateFinesReportPDF = (fines: any[]) => {
     return;
   }
 
-  // Summary stats
+  // 
   const totalFines = fines.reduce((sum, f) => sum + parseFloat(f.amount?.toString() || '0'), 0);
   const paidFines = fines.filter(f => f.status === 'paid').length;
   const overdueFines = fines.filter(f => f.status === 'overdue').length;
@@ -501,7 +520,7 @@ export const generateFinesReportPDF = (fines: any[]) => {
     ['Total Fines', fines.length.toString()]
   ];
 
-  generator.doc.autoTable({
+  autoTable(generator.doc, {
     startY: generator.currentY,
     head: [['Metric', 'Value']],
     body: summaryData,
@@ -510,10 +529,9 @@ export const generateFinesReportPDF = (fines: any[]) => {
     margin: { left: generator.margin, right: generator.margin }
   });
 
-  generator.currentY = generator.doc.lastAutoTable.finalY + 20;
+  generator.currentY = (generator.doc as any).lastAutoTable.finalY + 20;
   generator.checkPageBreak();
 
-  // Detailed fines
   const finesData = fines.map(f => [
     f.fineNo || 'N/A',
     f.memberName || 'N/A',
@@ -523,7 +541,7 @@ export const generateFinesReportPDF = (fines: any[]) => {
     f.status || 'N/A'
   ]);
 
-  generator.doc.autoTable({
+  autoTable(generator.doc, {
     startY: generator.currentY,
     head: [['Fine No', 'Member', 'Reason', 'Amount', 'Due Date', 'Status']],
     body: finesData,
@@ -546,7 +564,7 @@ export const generateDividendsReportPDF = (dividends: any[], memberDividends: an
     return;
   }
 
-  // Summary stats
+  // 
   const totalDistributed = dividends.filter(d => d.status === 'distributed').reduce((sum, d) => sum + d.totalAmount, 0);
   const pendingDistribution = dividends.filter(d => d.status === 'calculated').reduce((sum, d) => sum + d.totalAmount, 0);
 
@@ -557,7 +575,7 @@ export const generateDividendsReportPDF = (dividends: any[], memberDividends: an
     ['Total Members', memberDividends.length.toString()]
   ];
 
-  generator.doc.autoTable({
+  autoTable(generator.doc, {
     startY: generator.currentY,
     head: [['Metric', 'Value']],
     body: summaryData,
@@ -566,10 +584,9 @@ export const generateDividendsReportPDF = (dividends: any[], memberDividends: an
     margin: { left: generator.margin, right: generator.margin }
   });
 
-  generator.currentY = generator.doc.lastAutoTable.finalY + 20;
+  generator.currentY = (generator.doc as any).lastAutoTable.finalY + 20;
   generator.checkPageBreak();
 
-  // Dividend periods
   generator.doc.setFontSize(14);
   generator.doc.setFont('helvetica', 'bold');
   generator.doc.text('Dividend History', generator.margin, generator.currentY);
@@ -584,7 +601,7 @@ export const generateDividendsReportPDF = (dividends: any[], memberDividends: an
     d.status
   ]);
 
-  generator.doc.autoTable({
+  autoTable(generator.doc, {
     startY: generator.currentY,
     head: [['Period', 'Total Amount', 'Per Share', 'Shares', 'Date Distributed', 'Status']],
     body: dividendsData,
@@ -594,10 +611,9 @@ export const generateDividendsReportPDF = (dividends: any[], memberDividends: an
     styles: { fontSize: 9 }
   });
 
-  generator.currentY = generator.doc.lastAutoTable.finalY + 20;
+  generator.currentY = (generator.doc as any).lastAutoTable.finalY + 20;
   generator.checkPageBreak();
 
-  // Member dividends
   if (memberDividends.length > 0) {
     generator.doc.setFontSize(14);
     generator.doc.setFont('helvetica', 'bold');
@@ -612,7 +628,7 @@ export const generateDividendsReportPDF = (dividends: any[], memberDividends: an
       `KES ${m.totalDividend?.toLocaleString() || '0'}`
     ]);
 
-    generator.doc.autoTable({
+    autoTable(generator.doc, {
       startY: generator.currentY,
       head: [['Member', 'Shares', 'Q1 Dividend', 'Q2 Dividend', 'Total 2024']],
       body: memberData,
@@ -636,7 +652,7 @@ export const generateMeetingsReportPDF = (meetings: any[]) => {
     return;
   }
 
-  // Summary stats
+  // 
   const upcomingMeetings = meetings.filter(m => m.status === 'scheduled').length;
   const completedMeetings = meetings.filter(m => m.status === 'completed').length;
   const totalAttendees = meetings.reduce((sum, m) => sum + (m.attendees_count || 0), 0);
@@ -649,7 +665,7 @@ export const generateMeetingsReportPDF = (meetings: any[]) => {
     ['Average Attendance', averageAttendance.toString()]
   ];
 
-  generator.doc.autoTable({
+  autoTable(generator.doc, {
     startY: generator.currentY,
     head: [['Metric', 'Value']],
     body: summaryData,
@@ -658,10 +674,9 @@ export const generateMeetingsReportPDF = (meetings: any[]) => {
     margin: { left: generator.margin, right: generator.margin }
   });
 
-  generator.currentY = generator.doc.lastAutoTable.finalY + 20;
+  generator.currentY = (generator.doc as any).lastAutoTable.finalY + 20;
   generator.checkPageBreak();
 
-  // Detailed meetings
   const meetingsData = meetings.map(m => [
     m.title || 'N/A',
     new Date(m.date).toLocaleDateString(),
@@ -671,7 +686,7 @@ export const generateMeetingsReportPDF = (meetings: any[]) => {
     m.status || 'N/A'
   ]);
 
-  generator.doc.autoTable({
+  autoTable(generator.doc, {
     startY: generator.currentY,
     head: [['Title', 'Date', 'Time', 'Venue', 'Attendees', 'Status']],
     body: meetingsData,
@@ -694,7 +709,7 @@ export const generateAuditLogsReportPDF = (auditLogs: any[]) => {
     return;
   }
 
-  // Summary stats
+  // 
   const uniqueActions = [...new Set(auditLogs.map(log => log.action))].length;
   const todayActions = auditLogs.filter(log => 
     new Date(log.created_at).toDateString() === new Date().toDateString()
@@ -708,7 +723,7 @@ export const generateAuditLogsReportPDF = (auditLogs: any[]) => {
     ['Active Users', uniqueActors.toString()]
   ];
 
-  generator.doc.autoTable({
+  autoTable(generator.doc, {
     startY: generator.currentY,
     head: [['Metric', 'Value']],
     body: summaryData,
@@ -717,10 +732,9 @@ export const generateAuditLogsReportPDF = (auditLogs: any[]) => {
     margin: { left: generator.margin, right: generator.margin }
   });
 
-  generator.currentY = generator.doc.lastAutoTable.finalY + 20;
+  generator.currentY = (generator.doc as any).lastAutoTable.finalY + 20;
   generator.checkPageBreak();
 
-  // Recent activities (last 50)
   const recentLogs = auditLogs.slice(0, 50);
   const logsData = recentLogs.map(log => [
     log.action || 'N/A',
@@ -730,7 +744,7 @@ export const generateAuditLogsReportPDF = (auditLogs: any[]) => {
     log.meta ? JSON.stringify(log.meta).substring(0, 50) + '...' : 'No details'
   ]);
 
-  generator.doc.autoTable({
+  autoTable(generator.doc, {
     startY: generator.currentY,
     head: [['Action', 'Actor', 'Date', 'Time', 'Details']],
     body: logsData,
