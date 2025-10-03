@@ -81,51 +81,127 @@ const reportCategories = ['All', 'Financial', 'Members', 'Loans', 'Dividends', '
 
 export default function ReportsView() {
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const { summary, loading, exportToPDF, generateReport } = useFinancialData();
 
   const filteredReports = availableReports.filter(report => 
     selectedCategory === 'All' || report.category === selectedCategory
   );
 
-  const handleGenerateReport = async (reportType: string) => {
+  const handleGenerateReport = async (reportId: string) => {
     if (!summary) return;
 
-    switch (reportType) {
-      case 'financial-summary':
-        const financialData = [
-          { metric: 'Total Contributions', amount: summary.totalContributions },
-          { metric: 'Total Loans', amount: summary.totalLoans },
-          { metric: 'Total Expenses', amount: summary.totalExpenses },
-          { metric: 'Available Cash', amount: summary.availableCash }
-        ];
-        exportToPDF(financialData, 'financial-summary');
-        break;
-      
-      case 'member-balances':
-        exportToPDF(summary.memberBalances, 'member-balances');
-        break;
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const selectedDate = new Date(selectedMonth);
+      const startDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1).toISOString();
+      const endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0, 23, 59, 59).toISOString();
+
+      switch (reportId) {
+        case '1': // Monthly Financial Statement
+          const financialData = [
+            { metric: 'Total Contributions', amount: summary.totalContributions },
+            { metric: 'Total Loans', amount: summary.totalLoans },
+            { metric: 'Total Expenses', amount: summary.totalExpenses },
+            { metric: 'Available Cash', amount: summary.availableCash }
+          ];
+          exportToPDF(financialData, `financial-statement-${selectedMonth}`);
+          break;
         
-      case 'contributions-summary':
-        const contributionSummary = summary.memberBalances.map(member => ({
-          memberNo: member.memberNo,
-          memberName: member.memberName,
-          totalContributions: member.totalContributions
-        }));
-        exportToPDF(contributionSummary, 'contributions-summary');
-        break;
-        
-      case 'print-report':
-        const printData = [
-          { metric: 'Total Contributions', amount: summary.totalContributions },
-          { metric: 'Total Loans', amount: summary.totalLoans },
-          { metric: 'Total Expenses', amount: summary.totalExpenses },
-          { metric: 'Available Cash', amount: summary.availableCash }
-        ];
-        const { generateFinancialSummaryPDF } = await import('@/utils/pdfGenerator');
-        const generator = new (await import('@/utils/pdfGenerator')).PDFGenerator();
-        const doc = generator.generateFinancialReport(printData, 'Financial Summary Report');
-        generator.print();
-        break;
+        case '2': // Member Contribution Summary
+          const { data: contributions } = await supabase
+            .from('contributions')
+            .select('*, users!inner(first_name, last_name, member_no)')
+            .gte('contribution_date', startDate)
+            .lte('contribution_date', endDate);
+          
+          if (contributions) {
+            const { generateContributionsPDF } = await import('@/utils/pdfGenerator');
+            const formattedContribs = contributions.map((c: any) => ({
+              receiptNo: c.receipt_no || 'N/A',
+              memberName: `${c.users.first_name} ${c.users.last_name}`,
+              memberNo: c.users.member_no,
+              amount: parseFloat(c.amount),
+              date: c.contribution_date,
+              paymentMethod: c.payment_method || 'Cash',
+              status: 'Paid'
+            }));
+            generateContributionsPDF(formattedContribs);
+          }
+          break;
+          
+        case '3': // Loan Portfolio Report
+          const { data: loans } = await supabase
+            .from('loans')
+            .select('*, users!inner(first_name, last_name, member_no)')
+            .gte('issue_date', startDate)
+            .lte('issue_date', endDate);
+          
+          if (loans) {
+            const { generateLoansReportPDF } = await import('@/utils/pdfGenerator');
+            const formattedLoans = loans.map((l: any) => ({
+              loanNo: `L${l.id.slice(0, 8)}`,
+              memberName: `${l.users.first_name} ${l.users.last_name}`,
+              principal: parseFloat(l.principal),
+              balance: parseFloat(l.principal), // TODO: Calculate actual balance
+              interestRate: l.interest_rate,
+              term: l.term_months,
+              status: l.status
+            }));
+            generateLoansReportPDF(formattedLoans);
+          }
+          break;
+          
+        case '4': // Cash Flow Statement
+          exportToPDF(summary.memberBalances, `cash-flow-${selectedMonth}`);
+          break;
+          
+        case '5': // Dividend Distribution Report
+          const { data: dividends } = await supabase
+            .from('dividends')
+            .select('*')
+            .gte('created_at', startDate)
+            .lte('created_at', endDate);
+          
+          if (dividends && dividends.length > 0) {
+            const { generateDividendsReportPDF } = await import('@/utils/pdfGenerator');
+            const formattedDividends = dividends.map((d: any) => ({
+              year: new Date(d.created_at).getFullYear(),
+              period: d.period,
+              totalAmount: parseFloat(d.allocation_amount || 0),
+              perShare: 0,
+              shares: 0,
+              dateDistributed: d.payout_date,
+              status: d.payout_date ? 'distributed' : 'calculated'
+            }));
+            generateDividendsReportPDF(formattedDividends, []);
+          }
+          break;
+          
+        case '6': // Fines & Penalties Report
+          const { data: fines } = await supabase
+            .from('fines')
+            .select('*, users!inner(first_name, last_name, member_no)')
+            .gte('fine_date', startDate)
+            .lte('fine_date', endDate);
+          
+          if (fines) {
+            const { generateFinesReportPDF } = await import('@/utils/pdfGenerator');
+            const formattedFines = fines.map((f: any) => ({
+              fineNo: `F${f.id.slice(0, 8)}`,
+              memberName: `${f.users.first_name} ${f.users.last_name}`,
+              reason: f.reason || 'N/A',
+              amount: parseFloat(f.amount),
+              dueDate: f.fine_date,
+              status: f.status
+            }));
+            generateFinesReportPDF(formattedFines);
+          }
+          break;
+      }
+    } catch (error) {
+      console.error('Error generating report:', error);
+      alert('Error generating report. Please try again.');
     }
   };
 
@@ -331,27 +407,43 @@ export default function ReportsView() {
         </div>
       </motion.div>
 
-      {/* Category Filters */}
+      {/* Category Filters & Month Selection */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.7 }}
-        className="flex items-center space-x-4"
+        className="space-y-4"
       >
-        <span className="text-sm font-medium text-foreground">Filter by category:</span>
-        {reportCategories.map((category) => (
-          <button
-            key={category}
-            onClick={() => setSelectedCategory(category)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-              selectedCategory === category
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-secondary text-secondary-foreground hover:bg-muted'
-            }`}
-          >
-            {category}
-          </button>
-        ))}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <span className="text-sm font-medium text-foreground">Filter by category:</span>
+            {reportCategories.map((category) => (
+              <button
+                key={category}
+                onClick={() => setSelectedCategory(category)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  selectedCategory === category
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-secondary text-secondary-foreground hover:bg-muted'
+                }`}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <CalendarDaysIcon className="h-5 w-5 text-muted-foreground" />
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              max={new Date().toISOString().slice(0, 7)}
+              className="px-3 py-2 border border-input-border rounded-lg bg-input text-sm focus:outline-none focus:ring-2 focus:ring-accent-border"
+            />
+            <span className="text-sm text-muted-foreground">Report Period</span>
+          </div>
+        </div>
       </motion.div>
 
       {/* Reports Grid */}

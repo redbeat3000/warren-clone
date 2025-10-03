@@ -58,31 +58,30 @@ export default function AuditLogsView() {
       const { data: logs, error } = await supabase
         .from('audit_logs')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (error) throw error;
 
-      // Get actor names for logs that have actor_id
-      const logsWithActors = await Promise.all(
-        (logs || []).map(async (log) => {
-          if (log.actor_id) {
-            const { data: user } = await supabase
-              .from('users')
-              .select('first_name, last_name')
-              .eq('id', log.actor_id)
-              .single();
-            
-            return {
-              ...log,
-              actor_name: user ? `${user.first_name} ${user.last_name}` : 'Unknown User'
-            };
-          }
-          return {
-            ...log,
-            actor_name: 'System'
-          };
-        })
+      // Get unique actor IDs
+      const actorIds = [...new Set(logs?.map(log => log.actor_id).filter(Boolean))];
+      
+      // Fetch all actors at once
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, first_name, last_name')
+        .in('id', actorIds);
+      
+      // Create a map for quick lookup
+      const userMap = new Map(
+        users?.map(user => [user.id, `${user.first_name} ${user.last_name}`]) || []
       );
+
+      // Map logs with actor names
+      const logsWithActors = (logs || []).map((log) => ({
+        ...log,
+        actor_name: log.actor_id ? (userMap.get(log.actor_id) || 'Unknown User') : 'System'
+      }));
 
       setAuditLogs(logsWithActors);
     } catch (error) {

@@ -32,9 +32,18 @@ export function useSettings() {
           'maximum_members'
         ]);
 
-      if (error) throw error;
+      if (error) {
+        console.warn('Settings table error:', error);
+        // Use default settings if table doesn't exist or has no data
+        return;
+      }
 
-      const settingsMap = data?.reduce((acc: any, setting) => {
+      if (!data || data.length === 0) {
+        console.warn('No settings found in database, using defaults');
+        return;
+      }
+
+      const settingsMap = data.reduce((acc: any, setting) => {
         acc[setting.key] = setting.value;
         return acc;
       }, {});
@@ -47,11 +56,7 @@ export function useSettings() {
       });
     } catch (error) {
       console.error('Error fetching settings:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load settings',
-        variant: 'destructive'
-      });
+      // Don't show error toast, just use default settings
     } finally {
       setLoading(false);
     }
