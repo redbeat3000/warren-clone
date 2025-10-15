@@ -90,19 +90,31 @@ export default function AddLoanForm({ onSuccess, onClose }: AddLoanFormProps) {
 
   const onSubmit = async (data: LoanFormData) => {
     try {
-      const principal = Number(data.principal);
+      const principal = parseFloat(Number(data.principal).toFixed(2));
+      const interestRate = parseFloat(Number(data.interestRate).toFixed(2));
       const termMonths = Number(data.termMonths);
       const dueDate = calculateDueDate(data.issueDate, termMonths);
+      
+      // Calculate total interest based on interest type
+      let totalInterest = 0;
+      if (data.interestType === 'flat') {
+        totalInterest = parseFloat(((principal * interestRate * termMonths) / 100).toFixed(2));
+      } else {
+        // Declining balance - approximate total interest
+        totalInterest = parseFloat(((principal * interestRate * (termMonths + 1)) / 200).toFixed(2));
+      }
 
       const loanData = {
         member_id: data.memberId,
         principal,
-        interest_rate: Number(data.interestRate),
+        interest_rate: interestRate,
         term_months: termMonths,
         interest_type: data.interestType,
         issue_date: data.issueDate,
         due_date: dueDate,
         notes: data.notes || null,
+        total_interest_calculated: totalInterest,
+        interest_paid: 0,
         status: 'active' as any,
       };
 

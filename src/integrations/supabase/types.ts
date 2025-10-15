@@ -57,10 +57,11 @@ export type Database = {
         Row: {
           amount: number
           contribution_date: string
-          contribution_type: string | null
+          contribution_type: Database["public"]["Enums"]["contribution_type"]
           created_at: string
           created_by: string | null
           id: string
+          is_dividend_eligible: boolean | null
           member_id: string
           notes: string | null
           payment_method: string | null
@@ -69,10 +70,11 @@ export type Database = {
         Insert: {
           amount: number
           contribution_date?: string
-          contribution_type?: string | null
+          contribution_type?: Database["public"]["Enums"]["contribution_type"]
           created_at?: string
           created_by?: string | null
           id?: string
+          is_dividend_eligible?: boolean | null
           member_id: string
           notes?: string | null
           payment_method?: string | null
@@ -81,10 +83,11 @@ export type Database = {
         Update: {
           amount?: number
           contribution_date?: string
-          contribution_type?: string | null
+          contribution_type?: Database["public"]["Enums"]["contribution_type"]
           created_at?: string
           created_by?: string | null
           id?: string
+          is_dividend_eligible?: boolean | null
           member_id?: string
           notes?: string | null
           payment_method?: string | null
@@ -100,6 +103,73 @@ export type Database = {
           },
           {
             foreignKeyName: "contributions_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dividend_allocations: {
+        Row: {
+          allocated_amount: number | null
+          calculation_id: string
+          calculation_notes: string | null
+          created_at: string | null
+          id: string
+          member_contribution_for_dividends: number | null
+          member_id: string
+          payout_date: string | null
+          payout_status: string | null
+          share_percentage: number | null
+          total_contributions_for_dividends: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          allocated_amount?: number | null
+          calculation_id: string
+          calculation_notes?: string | null
+          created_at?: string | null
+          id?: string
+          member_contribution_for_dividends?: number | null
+          member_id: string
+          payout_date?: string | null
+          payout_status?: string | null
+          share_percentage?: number | null
+          total_contributions_for_dividends?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          allocated_amount?: number | null
+          calculation_id?: string
+          calculation_notes?: string | null
+          created_at?: string | null
+          id?: string
+          member_contribution_for_dividends?: number | null
+          member_id?: string
+          payout_date?: string | null
+          payout_status?: string | null
+          share_percentage?: number | null
+          total_contributions_for_dividends?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dividend_allocations_calculation_id_fkey"
+            columns: ["calculation_id"]
+            isOneToOne: false
+            referencedRelation: "dividends_fund_calculations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dividend_allocations_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_contribution_summary"
+            referencedColumns: ["member_id"]
+          },
+          {
+            foreignKeyName: "dividend_allocations_member_id_fkey"
             columns: ["member_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -143,6 +213,75 @@ export type Database = {
           {
             foreignKeyName: "dividends_member_id_fkey"
             columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dividends_fund_calculations: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          calculation_date: string
+          calculation_formula: string | null
+          created_at: string | null
+          fines_collected: number | null
+          fiscal_year: number
+          id: string
+          investment_profits: number | null
+          loan_interest: number | null
+          registration_fees: number | null
+          relevant_expenses: number | null
+          status: string | null
+          total_dividends_fund: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          calculation_date?: string
+          calculation_formula?: string | null
+          created_at?: string | null
+          fines_collected?: number | null
+          fiscal_year: number
+          id?: string
+          investment_profits?: number | null
+          loan_interest?: number | null
+          registration_fees?: number | null
+          relevant_expenses?: number | null
+          status?: string | null
+          total_dividends_fund?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          calculation_date?: string
+          calculation_formula?: string | null
+          created_at?: string | null
+          fines_collected?: number | null
+          fiscal_year?: number
+          id?: string
+          investment_profits?: number | null
+          loan_interest?: number | null
+          registration_fees?: number | null
+          relevant_expenses?: number | null
+          status?: string | null
+          total_dividends_fund?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dividends_fund_calculations_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "member_contribution_summary"
+            referencedColumns: ["member_id"]
+          },
+          {
+            foreignKeyName: "dividends_fund_calculations_approved_by_fkey"
+            columns: ["approved_by"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -208,32 +347,38 @@ export type Database = {
       }
       expenses: {
         Row: {
+          affects_dividends: boolean | null
           amount: number
           category: string
           created_at: string
           created_by: string | null
           description: string | null
           expense_date: string
+          expense_impact: Database["public"]["Enums"]["expense_impact"] | null
           id: string
           receipt_url: string | null
         }
         Insert: {
+          affects_dividends?: boolean | null
           amount: number
           category: string
           created_at?: string
           created_by?: string | null
           description?: string | null
           expense_date?: string
+          expense_impact?: Database["public"]["Enums"]["expense_impact"] | null
           id?: string
           receipt_url?: string | null
         }
         Update: {
+          affects_dividends?: boolean | null
           amount?: number
           category?: string
           created_at?: string
           created_by?: string | null
           description?: string | null
           expense_date?: string
+          expense_impact?: Database["public"]["Enums"]["expense_impact"] | null
           id?: string
           receipt_url?: string | null
         }
@@ -258,27 +403,33 @@ export type Database = {
         Row: {
           amount: number
           created_at: string
+          due_date: string | null
           fine_date: string
           id: string
           member_id: string
+          paid_amount: number | null
           reason: string | null
           status: string
         }
         Insert: {
           amount: number
           created_at?: string
+          due_date?: string | null
           fine_date?: string
           id?: string
           member_id: string
+          paid_amount?: number | null
           reason?: string | null
           status?: string
         }
         Update: {
           amount?: number
           created_at?: string
+          due_date?: string | null
           fine_date?: string
           id?: string
           member_id?: string
+          paid_amount?: number | null
           reason?: string | null
           status?: string
         }
@@ -299,33 +450,87 @@ export type Database = {
           },
         ]
       }
+      investment_profits: {
+        Row: {
+          amount: number
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          profit_date: string
+          source: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          profit_date?: string
+          source: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          profit_date?: string
+          source?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investment_profits_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "member_contribution_summary"
+            referencedColumns: ["member_id"]
+          },
+          {
+            foreignKeyName: "investment_profits_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       loan_repayments: {
         Row: {
           amount: number
           created_at: string
           id: string
+          interest_portion: number | null
           loan_id: string
           member_id: string
           payment_date: string
           payment_method: string | null
+          principal_portion: number | null
         }
         Insert: {
           amount: number
           created_at?: string
           id?: string
+          interest_portion?: number | null
           loan_id: string
           member_id: string
           payment_date?: string
           payment_method?: string | null
+          principal_portion?: number | null
         }
         Update: {
           amount?: number
           created_at?: string
           id?: string
+          interest_portion?: number | null
           loan_id?: string
           member_id?: string
           payment_date?: string
           payment_method?: string | null
+          principal_portion?: number | null
         }
         Relationships: [
           {
@@ -356,6 +561,7 @@ export type Database = {
           created_at: string
           due_date: string | null
           id: string
+          interest_paid: number | null
           interest_rate: number
           interest_type: string
           issue_date: string
@@ -364,11 +570,13 @@ export type Database = {
           principal: number
           status: Database["public"]["Enums"]["loan_status"]
           term_months: number
+          total_interest_calculated: number | null
         }
         Insert: {
           created_at?: string
           due_date?: string | null
           id?: string
+          interest_paid?: number | null
           interest_rate: number
           interest_type?: string
           issue_date?: string
@@ -377,11 +585,13 @@ export type Database = {
           principal: number
           status?: Database["public"]["Enums"]["loan_status"]
           term_months: number
+          total_interest_calculated?: number | null
         }
         Update: {
           created_at?: string
           due_date?: string | null
           id?: string
+          interest_paid?: number | null
           interest_rate?: number
           interest_type?: string
           issue_date?: string
@@ -390,6 +600,7 @@ export type Database = {
           principal?: number
           status?: Database["public"]["Enums"]["loan_status"]
           term_months?: number
+          total_interest_calculated?: number | null
         }
         Relationships: [
           {
@@ -520,6 +731,54 @@ export type Database = {
           {
             foreignKeyName: "meetings_created_by_fkey"
             columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      member_fund_balances: {
+        Row: {
+          closing_balance: number | null
+          created_at: string | null
+          fiscal_year: number
+          fund_type: Database["public"]["Enums"]["contribution_type"]
+          id: string
+          member_id: string
+          opening_balance: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          closing_balance?: number | null
+          created_at?: string | null
+          fiscal_year: number
+          fund_type: Database["public"]["Enums"]["contribution_type"]
+          id?: string
+          member_id: string
+          opening_balance?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          closing_balance?: number | null
+          created_at?: string | null
+          fiscal_year?: number
+          fund_type?: Database["public"]["Enums"]["contribution_type"]
+          id?: string
+          member_id?: string
+          opening_balance?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "member_fund_balances_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_contribution_summary"
+            referencedColumns: ["member_id"]
+          },
+          {
+            foreignKeyName: "member_fund_balances_member_id_fkey"
+            columns: ["member_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -741,6 +1000,13 @@ export type Database = {
       }
     }
     Enums: {
+      contribution_type:
+        | "regular"
+        | "xmas_savings"
+        | "land_fund"
+        | "security_fund"
+        | "registration_fee"
+      expense_impact: "operational" | "fund_specific" | "investment"
       loan_status: "active" | "repaid" | "overdue" | "defaulted" | "draft"
       message_channel: "sms" | "email" | "whatsapp"
       message_status: "queued" | "sent" | "delivered" | "failed"
@@ -873,6 +1139,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      contribution_type: [
+        "regular",
+        "xmas_savings",
+        "land_fund",
+        "security_fund",
+        "registration_fee",
+      ],
+      expense_impact: ["operational", "fund_specific", "investment"],
       loan_status: ["active", "repaid", "overdue", "defaulted", "draft"],
       message_channel: ["sms", "email", "whatsapp"],
       message_status: ["queued", "sent", "delivered", "failed"],

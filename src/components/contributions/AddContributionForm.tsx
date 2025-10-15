@@ -17,7 +17,8 @@ const contributionSchema = z.object({
   amount: z.string().min(1, 'Amount is required').refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
     message: 'Amount must be a positive number',
   }),
-  contributionType: z.enum(['savings', 'land_fund', 'security', 'tea', 'xmas']),
+  contributionType: z.enum(['regular', 'xmas_savings', 'land_fund', 'security_fund', 'registration_fee']),
+  isDividendEligible: z.boolean().optional(),
   paymentMethod: z.string().optional(),
   receiptNo: z.string().optional(),
   notes: z.string().optional(),
@@ -48,7 +49,8 @@ export default function AddContributionForm({ onSuccess, onClose }: AddContribut
     defaultValues: {
       memberId: '',
       amount: '',
-      contributionType: 'savings',
+      contributionType: 'regular',
+      isDividendEligible: false,
       paymentMethod: 'M-Pesa',
       receiptNo: '',
       notes: '',
@@ -87,6 +89,7 @@ export default function AddContributionForm({ onSuccess, onClose }: AddContribut
         member_id: data.memberId,
         amount: Number(data.amount),
         contribution_type: data.contributionType,
+        is_dividend_eligible: data.isDividendEligible || data.contributionType === 'registration_fee',
         payment_method: data.paymentMethod || null,
         receipt_no: data.receiptNo || null,
         notes: data.notes || null,
@@ -185,19 +188,19 @@ export default function AddContributionForm({ onSuccess, onClose }: AddContribut
             name="contributionType"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Contribution Type</FormLabel>
+                <FormLabel>Fund Type</FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select contribution type" />
+                      <SelectValue placeholder="Select fund type" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="savings">Savings</SelectItem>
+                    <SelectItem value="regular">Regular Savings</SelectItem>
+                    <SelectItem value="xmas_savings">Xmas Savings</SelectItem>
                     <SelectItem value="land_fund">Land Fund</SelectItem>
-                    <SelectItem value="security">Security</SelectItem>
-                    <SelectItem value="tea">Tea</SelectItem>
-                    <SelectItem value="xmas">Christmas</SelectItem>
+                    <SelectItem value="security_fund">Security Fund</SelectItem>
+                    <SelectItem value="registration_fee">Registration Fee (Dividend Eligible)</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />

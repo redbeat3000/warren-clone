@@ -14,6 +14,12 @@ export interface MemberBalance {
   netBalance: number;
 }
 
+export interface FundBalance {
+  fundType: string;
+  totalBalance: number;
+  memberCount: number;
+}
+
 export interface FinancialSummary {
   totalContributions: number;
   totalLoans: number;
@@ -22,6 +28,11 @@ export interface FinancialSummary {
   totalDividends: number;
   availableCash: number;
   memberBalances: MemberBalance[];
+  fundBalances: FundBalance[];
+  dividendsFund: number;
+  registrationFees: number;
+  loanInterest: number;
+  investmentProfits: number;
 }
 
 export function useFinancialData() {
@@ -42,17 +53,21 @@ export function useFinancialData() {
         { data: loans },
         { data: expenses },
         { data: fines },
-        { data: dividends },
+        { data: dividendAllocations },
         { data: repayments },
-        { data: users }
+        { data: users },
+        { data: investmentProfits },
+        { data: dividendCalculations }
       ] = await Promise.all([
-        supabase.from('contributions').select('amount, member_id'),
-        supabase.from('loans').select('principal, member_id'),
-        supabase.from('expenses').select('amount'),
-        supabase.from('fines').select('amount, member_id'),
-        supabase.from('dividends').select('allocation_amount, member_id'),
-        supabase.from('loan_repayments').select('amount, member_id'),
-        supabase.from('users').select('id, first_name, last_name, full_name, member_no').eq('status', 'active')
+        supabase.from('contributions').select('amount, member_id, contribution_type, is_dividend_eligible'),
+        supabase.from('loans').select('principal, member_id, total_interest_calculated, interest_paid'),
+        supabase.from('expenses').select('amount, affects_dividends'),
+        supabase.from('fines').select('amount, member_id, paid_amount, status'),
+        supabase.from('dividend_allocations').select('allocated_amount, member_id, payout_status'),
+        supabase.from('loan_repayments').select('amount, member_id, interest_portion'),
+        supabase.from('users').select('id, first_name, last_name, full_name, member_no').eq('status', 'active'),
+        supabase.from('investment_profits').select('amount'),
+        supabase.from('dividends_fund_calculations').select('*').order('fiscal_year', { ascending: false }).limit(1)
       ]);
 
       // Calculate totals
@@ -60,8 +75,34 @@ export function useFinancialData() {
       const totalLoans = loans?.reduce((sum, l) => sum + Number(l.principal), 0) || 0;
       const totalExpenses = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
       const totalFines = fines?.reduce((sum, f) => sum + Number(f.amount), 0) || 0;
-      const totalDividends = dividends?.reduce((sum, d) => sum + Number(d.allocation_amount), 0) || 0;
+      const finesCollected = fines?.reduce((sum, f) => sum + Number(f.paid_amount || 0), 0) || 0;
+      const totalDividends = dividendAllocations?.filter(d => d.payout_status === 'paid')
+        .reduce((sum, d) => sum + Number(d.allocated_amount || 0), 0) || 0;
       const totalRepayments = repayments?.reduce((sum, r) => sum + Number(r.amount), 0) || 0;
+      
+      // Calculate registration fees (dividend-eligible contributions)
+      const registrationFees = contributions?.filter(c => c.is_dividend_eligible)
+        .reduce((sum, c) => sum + Number(c.amount), 0) || 0;
+      
+      // Calculate loan interest collected
+      const loanInterest = repayments?.reduce((sum, r) => sum + Number(r.interest_portion || 0), 0) || 0;
+      
+      // Calculate investment profits
+      const investmentProfitsTotal = investmentProfits?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+      
+      // Calculate dividends fund
+      const dividendExpenses = expenses?.filter(e => e.affects_dividends)
+        .reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+      const dividendsFund = registrationFees + finesCollected + loanInterest + investmentProfitsTotal - dividendExpenses;
+      
+      // Calculate fund balances
+      const fundBalances: FundBalance[] = [
+        { fundType: 'Regular Savings', totalBalance: contributions?.filter(c => c.contribution_type === 'regular').reduce((sum, c) => sum + Number(c.amount), 0) || 0, memberCount: 0 },
+        { fundType: 'Xmas Savings', totalBalance: contributions?.filter(c => c.contribution_type === 'xmas_savings').reduce((sum, c) => sum + Number(c.amount), 0) || 0, memberCount: 0 },
+        { fundType: 'Land Fund', totalBalance: contributions?.filter(c => c.contribution_type === 'land_fund').reduce((sum, c) => sum + Number(c.amount), 0) || 0, memberCount: 0 },
+        { fundType: 'Security Fund', totalBalance: contributions?.filter(c => c.contribution_type === 'security_fund').reduce((sum, c) => sum + Number(c.amount), 0) || 0, memberCount: 0 },
+        { fundType: 'Registration Fees', totalBalance: registrationFees, memberCount: 0 }
+      ];
 
       // Calculate member balances
       const memberBalances: MemberBalance[] = (users || []).map(user => {
@@ -77,8 +118,8 @@ export function useFinancialData() {
         const memberFines = fines?.filter(f => f.member_id === user.id)
           .reduce((sum, f) => sum + Number(f.amount), 0) || 0;
           
-        const memberDividends = dividends?.filter(d => d.member_id === user.id)
-          .reduce((sum, d) => sum + Number(d.allocation_amount), 0) || 0;
+        const memberDividends = dividendAllocations?.filter(d => d.member_id === user.id && d.payout_status === 'paid')
+          .reduce((sum, d) => sum + Number(d.allocated_amount || 0), 0) || 0;
 
         const outstandingBalance = memberLoans - memberRepayments;
         const netBalance = memberContributions + memberDividends - memberFines - outstandingBalance;
@@ -107,7 +148,12 @@ export function useFinancialData() {
         totalFines,
         totalDividends,
         availableCash,
-        memberBalances
+        memberBalances,
+        fundBalances,
+        dividendsFund,
+        registrationFees,
+        loanInterest,
+        investmentProfits: investmentProfitsTotal
       });
 
     } catch (error) {

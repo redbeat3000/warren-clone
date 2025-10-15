@@ -19,6 +19,7 @@ const fineSchema = z.object({
   }),
   reason: z.string().min(1, 'Reason is required').max(500, 'Reason must be less than 500 characters'),
   fineDate: z.string().min(1, 'Date is required'),
+  dueDate: z.string().optional(),
 });
 
 type FineFormData = z.infer<typeof fineSchema>;
@@ -46,6 +47,7 @@ export default function AddFineForm({ onSuccess, onClose }: AddFineFormProps) {
       amount: '',
       reason: '',
       fineDate: new Date().toISOString().split('T')[0],
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
     },
   });
 
@@ -77,9 +79,11 @@ export default function AddFineForm({ onSuccess, onClose }: AddFineFormProps) {
       const fineData = {
         member_id: data.memberId,
         amount: Number(data.amount),
+        paid_amount: 0,
         reason: data.reason,
         fine_date: data.fineDate,
-        status: 'unpaid',
+        due_date: data.dueDate || null,
+        status: 'unpaid' as 'unpaid',
       };
 
       const { data: result, error } = await supabase
