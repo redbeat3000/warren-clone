@@ -3,14 +3,15 @@ import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calculator, CheckCircle2, TrendingUp, Minus, Equal, AlertCircle, Receipt, CreditCard, Scale, Investment } from 'lucide-react';
+import { Calculator, CheckCircle2, TrendingUp, Minus, Equal, AlertCircle, Receipt, CreditCard, Scale, Investment, X } from 'lucide-react';
 import { auditLogger } from '@/utils/auditLogger';
 
 interface DividendCalculatorProps {
   onCalculationComplete: () => void;
+  onClose: () => void;
 }
 
 interface CalculationData {
@@ -28,7 +29,7 @@ interface CalculationData {
   expenseBreakdown: { category: string; amount: number }[];
 }
 
-export default function DividendCalculator({ onCalculationComplete }: DividendCalculatorProps) {
+export default function DividendCalculator({ onCalculationComplete, onClose }: DividendCalculatorProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [fiscalYear, setFiscalYear] = useState(new Date().getFullYear());
@@ -233,15 +234,20 @@ export default function DividendCalculator({ onCalculationComplete }: DividendCa
 
       if (allocError) throw allocError;
 
-      await auditLogger.logDataChange('create', 'dividends_fund_calculations', calcData.id, {
-        fiscal_year: fiscalYear,
-        total_income: calculation.totalIncome,
-        total_expenses: calculation.totalExpenses,
-        net_profit: calculation.netProfit,
-        member_count: allocations.length,
-        total_allocated: allocations.reduce((sum, a) => sum + a.allocated_amount, 0),
-        automated_income_sources: calculation.incomeBreakdown
-      });
+      // Log audit trail
+      try {
+        await auditLogger.logDataChange('create', 'dividends_fund_calculations', calcData.id, {
+          fiscal_year: fiscalYear,
+          total_income: calculation.totalIncome,
+          total_expenses: calculation.totalExpenses,
+          net_profit: calculation.netProfit,
+          member_count: allocations.length,
+          total_allocated: allocations.reduce((sum, a) => sum + a.allocated_amount, 0),
+          automated_income_sources: calculation.incomeBreakdown
+        });
+      } catch (auditError) {
+        console.error('Audit logging failed:', auditError);
+      }
 
       toast({
         title: 'Dividends Calculated Successfully',
@@ -285,16 +291,20 @@ export default function DividendCalculator({ onCalculationComplete }: DividendCa
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-6"
+      className="space-y-6 p-6"
     >
+      <div className="flex items-center justify-between">
+        <CardTitle className="flex items-center gap-2 text-2xl">
+          <Calculator className="h-6 w-6" />
+          Calculate Dividends
+        </CardTitle>
+        <Button variant="ghost" onClick={onClose}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5" />
-            Calculate Dividends (Automated Income Tracking)
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-6">
           <div>
             <Label>Fiscal Year</Label>
             <Input

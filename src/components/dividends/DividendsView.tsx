@@ -22,7 +22,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import DividendCalculator from './DividendCalculator';
 import DividendDistributionForm from './DividendDistributionForm';
-
 export default function DividendsView() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('overview');
