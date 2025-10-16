@@ -108,8 +108,9 @@ export default function DividendCalculator({ onCalculationComplete, onClose }: D
       const { data: expenseData, error: expenseError } = await supabase
         .from('expenses')
         .select('category, amount')
-        .eq('fiscal_year', fiscalYear)
-        .eq('affects_dividends', true);
+        .gte('expense_date', `${fiscalYear}-01-01`)
+        .lte('expense_date', `${fiscalYear}-12-31`)
+        .eq('affects_dividends', true as any);
 
       if (expenseError) throw expenseError;
 
@@ -121,11 +122,12 @@ export default function DividendCalculator({ onCalculationComplete, onClose }: D
       const totalExpenses = expenseBreakdown.reduce((sum, item) => sum + item.amount, 0);
 
       // Get total regular savings (for allocation calculation)
-      const { data: savingsData, error: savingsError } = await supabase
+      const { data: savingsData, error: savingsError} = await supabase
         .from('contributions')
         .select('amount')
-        .eq('contribution_type', 'regular')
-        .eq('fiscal_year', fiscalYear);
+        .eq('contribution_type', 'regular' as any)
+        .gte('contribution_date', `${fiscalYear}-01-01`)
+        .lte('contribution_date', `${fiscalYear}-12-31`);
 
       if (savingsError) throw savingsError;
 
@@ -223,8 +225,9 @@ export default function DividendCalculator({ onCalculationComplete, onClose }: D
       const { data: memberSavings, error: savingsError } = await supabase
         .from('contributions')
         .select('member_id, amount')
-        .eq('contribution_type', 'regular')
-        .eq('fiscal_year', fiscalYear);
+        .eq('contribution_type', 'regular' as any)
+        .gte('contribution_date', `${fiscalYear}-01-01`)
+        .lte('contribution_date', `${fiscalYear}-12-31`);
 
       if (savingsError) throw savingsError;
 

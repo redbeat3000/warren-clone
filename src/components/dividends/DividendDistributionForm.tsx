@@ -74,8 +74,9 @@ export default function DividendDistributionForm({
             .from('contributions')
             .select('amount')
             .eq('member_id', allocation.member_id)
-            .eq('contribution_type', 'regular')
-            .eq('fiscal_year', fiscalYear);
+            .eq('contribution_type', 'regular' as any)
+            .gte('contribution_date', `${fiscalYear}-01-01`)
+            .lte('contribution_date', `${fiscalYear}-12-31`);
 
           const savings_balance = savingsData?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
 

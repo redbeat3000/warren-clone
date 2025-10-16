@@ -6,10 +6,12 @@ import {
   CalendarDaysIcon,
   DocumentArrowDownIcon,
   EyeIcon,
-  PrinterIcon
+  PrinterIcon,
+  PencilIcon
 } from '@heroicons/react/24/outline';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import AddContributionForm from './AddContributionForm';
+import { EditContributionDialog } from '@/components/members/EditContributionDialog';
 import { supabase } from '@/integrations/supabase/client';
 
 // Sample contributions data
@@ -59,6 +61,7 @@ const sampleContributions = [
 export default function ContributionsView() {
   const [filter, setFilter] = useState('all');
   const [isAddContributionOpen, setIsAddContributionOpen] = useState(false);
+  const [editingContribution, setEditingContribution] = useState<any>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [contributions, setContributions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,6 +100,7 @@ export default function ContributionsView() {
       if (error) throw error;
 
       const formattedContributions = (data || []).map((contrib: any) => ({
+        ...contrib,
         id: contrib.id,
         receiptNo: contrib.receipt_no || `REC${contrib.id.slice(-3)}`,
         memberName: `${contrib.users.first_name} ${contrib.users.last_name}`,
@@ -365,6 +369,13 @@ export default function ContributionsView() {
                       </button>
                       <button 
                         className="p-1 hover:bg-secondary rounded transition-colors"
+                        onClick={() => setEditingContribution(contribution)}
+                        title="Edit Contribution"
+                      >
+                        <PencilIcon className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                      <button 
+                        className="p-1 hover:bg-secondary rounded transition-colors"
                         onClick={handlePrintContributions}
                         title="Print Contributions"
                       >
@@ -378,6 +389,18 @@ export default function ContributionsView() {
           </table>
         </div>
       </motion.div>
+      
+      {editingContribution && (
+        <EditContributionDialog
+          contribution={editingContribution}
+          open={!!editingContribution}
+          onOpenChange={(open) => !open && setEditingContribution(null)}
+          onSuccess={() => {
+            setEditingContribution(null);
+            fetchContributions();
+          }}
+        />
+      )}
     </div>
   );
 }

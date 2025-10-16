@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { UserCircleIcon, PhoneIcon, EnvelopeIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { supabase } from '@/integrations/supabase/client';
-import { generateMemberReportPDF } from '@/utils/pdfGenerator';
+import { generateMemberReportPDF } from '@/utils/memberReportPDF';
+import { useToast } from '@/hooks/use-toast';
 
 interface Member {
   id: string;
@@ -92,9 +93,15 @@ export default function MemberDetailsDialog({ member, open, onClose }: MemberDet
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
-        <DialogHeader>
+      <DialogHeader>
+        <div className="flex items-center justify-between">
           <DialogTitle>Member Details</DialogTitle>
-        </DialogHeader>
+          <Button onClick={handleDownloadReport} size="sm" variant="outline">
+            <Download className="h-4 w-4 mr-2" />
+            Download Report
+          </Button>
+        </div>
+      </DialogHeader>
         
         <motion.div
           initial={{ opacity: 0, y: 20 }}

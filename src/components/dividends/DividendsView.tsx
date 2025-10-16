@@ -77,11 +77,11 @@ export default function DividendsView() {
         { data: investmentProfits },
         { data: expenseData }
       ] = await Promise.all([
-        supabase.from('contributions').select('amount').eq('is_dividend_eligible', true).gte('contribution_date', `${currentYear}-01-01`).lte('contribution_date', `${currentYear}-12-31`),
+        supabase.from('contributions').select('amount').eq('is_dividend_eligible', true as any).gte('contribution_date', `${currentYear}-01-01`).lte('contribution_date', `${currentYear}-12-31`),
         supabase.from('fines').select('paid_amount').gte('fine_date', `${currentYear}-01-01`).lte('fine_date', `${currentYear}-12-31`),
         supabase.from('loan_repayments').select('interest_portion').gte('payment_date', `${currentYear}-01-01`).lte('payment_date', `${currentYear}-12-31`),
         supabase.from('investment_profits').select('amount').gte('profit_date', `${currentYear}-01-01`).lte('profit_date', `${currentYear}-12-31`),
-        supabase.from('expenses').select('amount').gte('expense_date', `${currentYear}-01-01`).lte('expense_date', `${currentYear}-12-31`).eq('affects_dividends', true)
+        supabase.from('expenses').select('amount').gte('expense_date', `${currentYear}-01-01`).lte('expense_date', `${currentYear}-12-31`).eq('affects_dividends', true as any)
       ]);
 
       const totalIncome = 
@@ -504,7 +504,7 @@ export default function DividendsView() {
       {showCalculator && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <DividendCalculator onCalculationComplete={handleCalculationComplete} />
+            <DividendCalculator onCalculationComplete={handleCalculationComplete} onClose={() => setShowCalculator(false)} />
           </div>
         </div>
       )}
@@ -518,6 +518,7 @@ export default function DividendsView() {
               fiscalYear={selectedCalculation.fiscal_year}
               totalDividendFund={selectedCalculation.total_dividends_fund}
               onDistributionComplete={handleDistributionComplete}
+              onClose={() => setSelectedCalculation(null)}
             />
           </div>
         </div>
