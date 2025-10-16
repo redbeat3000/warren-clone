@@ -3,8 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, TrendingUp, FileText, Calculator, RefreshCw } from 'lucide-react';
-import IncomeRecordingForm from './IncomeRecordingForm'; // ✅ IMPORT THE ACTUAL FORM COMPONENT
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, TrendingUp, FileText, Calculator, RefreshCw, Eye, EyeOff, Download, Calendar } from 'lucide-react';
+import IncomeRecordingForm from './IncomeRecordingForm';
 
 interface IncomeSummary {
   fiscal_year: number;
@@ -14,77 +16,86 @@ interface IncomeSummary {
   affects_dividends: boolean;
 }
 
+interface IncomeTransaction {
+  id: string;
+  amount: number;
+  income_date: string;
+  description: string;
+  receipt_no: string;
+  payment_method: string;
+  status: string;
+  category_name: string;
+  recorded_by_name: string;
+}
+
 export default function IncomeDashboard() {
   const [incomeSummary, setIncomeSummary] = useState<IncomeSummary[]>([]);
+  const [incomeTransactions, setIncomeTransactions] = useState<IncomeTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [showIncomeForm, setShowIncomeForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('summary');
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   useEffect(() => {
-    fetchIncomeSummary();
-  }, []);
+    fetchIncomeData();
+  }, [selectedYear]);
 
-  const fetchIncomeSummary = async () => {
+  const fetchIncomeData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Enhanced mock data with registration fees and more categories
-      const mockData: IncomeSummary[] = [
-        {
-          fiscal_year: 2024,
-          category_name: 'Member Contributions',
-          total_amount: 500000,
-          transaction_count: 45,
-          affects_dividends: true
-        },
-        {
-          fiscal_year: 2024,
-          category_name: 'Investment Income',
-          total_amount: 150000,
-          transaction_count: 8,
-          affects_dividends: true
-        },
-        {
-          fiscal_year: 2024,
-          category_name: 'Loan Interest',
-          total_amount: 75000,
-          transaction_count: 12,
-          affects_dividends: true
-        },
-        {
-          fiscal_year: 2024,
-          category_name: 'Registration Fees',
-          total_amount: 25000,
-          transaction_count: 5,
-          affects_dividends: false  // Registration fees typically don't affect dividends
-        },
-        {
-          fiscal_year: 2024,
-          category_name: 'Other Income',
-          total_amount: 50000,
-          transaction_count: 3,
-          affects_dividends: true
-        }
-      ];
+      // Fetch income summary
+      const { data: summaryData, error: summaryError } = await supabase
+        .from('yearly_income_summary')
+        .select('*')
+        .eq('fiscal_year', selectedYear)
+        .order('total_amount', { ascending: false });
 
-      // Try to fetch real data, fall back to mock data
-      try {
-        const { data, error } = await supabase
-          .from('yearly_income_summary')
-          .select('*')
-          .order('fiscal_year', { ascending: false })
-          .order('total_amount', { ascending: false });
+      if (summaryError) throw summaryError;
 
-        if (error) throw error;
-        setIncomeSummary(data && data.length > 0 ? data : mockData);
-      } catch (dbError) {
-        console.log('Using mock income data due to:', dbError);
-        setIncomeSummary(mockData);
-      }
+      // Fetch detailed transactions
+      const { data: transactionData, error: transactionError } = await supabase
+        .from('income_records')
+        .select(`
+          id,
+          amount,
+          income_date,
+          description,
+          receipt_no,
+          payment_method,
+          status,
+          income_categories!inner (
+            name
+          ),
+          users!income_records_recorded_by_fkey (
+            first_name,
+            last_name
+          )
+        `)
+        .eq('fiscal_year', selectedYear)
+        .order('income_date', { ascending: false });
+
+      if (transactionError) throw transactionError;
+
+      const formattedTransactions: IncomeTransaction[] = transactionData?.map(tx => ({
+        id: tx.id,
+        amount: tx.amount,
+        income_date: tx.income_date,
+        description: tx.description,
+        receipt_no: tx.receipt_no,
+        payment_method: tx.payment_method,
+        status: tx.status,
+        category_name: tx.income_categories.name,
+        recorded_by_name: tx.users ? `${tx.users.first_name} ${tx.users.last_name}` : 'System'
+      })) || [];
+
+      setIncomeSummary(summaryData || []);
+      setIncomeTransactions(formattedTransactions);
 
     } catch (error) {
-      console.error('Error fetching income summary:', error);
+      console.error('Error fetching income data:', error);
       setError('Failed to load income data. Please try again.');
     } finally {
       setLoading(false);
@@ -101,12 +112,38 @@ export default function IncomeDashboard() {
 
   const totalIncome = totalDividendIncome + totalNonDividendIncome;
 
+  const exportToCSV = () => {
+    const headers = ['Date', 'Category', 'Description', 'Amount', 'Receipt No', 'Payment Method', 'Status', 'Recorded By'];
+    const csvData = incomeTransactions.map(tx => [
+      tx.income_date,
+      tx.category_name,
+      tx.description,
+      `KES ${tx.amount.toLocaleString()}`,
+      tx.receipt_no,
+      tx.payment_method,
+      tx.status,
+      tx.recorded_by_name
+    ]);
+
+    const csvContent = [headers, ...csvData]
+      .map(row => row.map(field => `"${field}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `income-transactions-${selectedYear}.csv`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   if (error) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="text-red-600 text-lg mb-2">{error}</div>
-          <Button onClick={fetchIncomeSummary}>
+          <Button onClick={fetchIncomeData}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Retry
           </Button>
@@ -130,11 +167,28 @@ export default function IncomeDashboard() {
             <Plus className="w-4 h-4 mr-2" />
             Record Income
           </Button>
-          <Button variant="outline" onClick={fetchIncomeSummary} disabled={loading}>
+          <Button variant="outline" onClick={fetchIncomeData} disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
+      </div>
+
+      {/* Year Selector */}
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4" />
+          <span className="text-sm font-medium">Fiscal Year:</span>
+        </div>
+        <select 
+          value={selectedYear}
+          onChange={(e) => setSelectedYear(Number(e.target.value))}
+          className="border rounded-md px-3 py-2 text-sm"
+        >
+          {[2023, 2024, 2025].map(year => (
+            <option key={year} value={year}>{year}</option>
+          ))}
+        </select>
       </div>
 
       {/* Summary Cards */}
@@ -149,7 +203,7 @@ export default function IncomeDashboard() {
               KES {totalIncome.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
-              All income sources
+              All income sources in {selectedYear}
             </p>
           </CardContent>
         </Card>
@@ -185,64 +239,160 @@ export default function IncomeDashboard() {
         </Card>
       </div>
 
-      {/* Income Breakdown */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Income Breakdown by Category</CardTitle>
-          <CardDescription>
-            Detailed view of all income sources and their dividend eligibility
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="text-center py-8">
-              <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
-              <div>Loading income data...</div>
-            </div>
-          ) : incomeSummary.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No income records found. Click "Record Income" to add your first income transaction.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {incomeSummary.map((item, index) => (
-                <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                    <div>
-                      <div className="font-medium">{item.category_name}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {item.transaction_count} transactions in {item.fiscal_year}
+      {/* Tabs for Summary and Details */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="summary">Income Summary</TabsTrigger>
+          <TabsTrigger value="details">Transaction Details</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="summary" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Income Breakdown by Category</CardTitle>
+              <CardDescription>
+                Detailed view of all income sources and their dividend eligibility
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="text-center py-8">
+                  <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
+                  <div>Loading income data...</div>
+                </div>
+              ) : incomeSummary.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No income records found for {selectedYear}. Click "Record Income" to add your first income transaction.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {incomeSummary.map((item, index) => (
+                    <div key={index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center space-x-4">
+                        <div className={`w-3 h-3 rounded-full ${item.affects_dividends ? 'bg-green-500' : 'bg-blue-500'}`}></div>
+                        <div>
+                          <div className="font-medium">{item.category_name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {item.transaction_count} transactions in {item.fiscal_year}
+                          </div>
+                        </div>
+                        {item.affects_dividends ? (
+                          <Badge variant="default" className="bg-green-100 text-green-800">
+                            Dividend Income
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">Operational</Badge>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-lg">KES {item.total_amount.toLocaleString()}</div>
+                        <div className="text-sm text-muted-foreground">
+                          {totalIncome > 0 ? ((item.total_amount / totalIncome) * 100).toFixed(1) : 0}% of total
+                        </div>
                       </div>
                     </div>
-                    {item.affects_dividends ? (
-                      <Badge variant="default" className="bg-green-100 text-green-800">
-                        Dividend Income
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary">Operational</Badge>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold text-lg">KES {item.total_amount.toLocaleString()}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {totalIncome > 0 ? ((item.total_amount / totalIncome) * 100).toFixed(1) : 0}% of total
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      {/* ✅ USE THE ACTUAL INCOME RECORDING FORM COMPONENT */}
+        <TabsContent value="details" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>Income Transactions</CardTitle>
+                  <CardDescription>
+                    Detailed view of all income transactions for {selectedYear}
+                  </CardDescription>
+                </div>
+                <Button variant="outline" onClick={exportToCSV}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Export CSV
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="text-center py-8">
+                  <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2" />
+                  <div>Loading transactions...</div>
+                </div>
+              ) : incomeTransactions.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No transactions found for {selectedYear}.
+                </div>
+              ) : (
+                <div className="border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Receipt No</TableHead>
+                        <TableHead>Payment Method</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Recorded By</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {incomeTransactions.map((transaction) => (
+                        <TableRow key={transaction.id}>
+                          <TableCell className="font-medium">
+                            {new Date(transaction.income_date).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="capitalize">
+                              {transaction.category_name.replace('_', ' ')}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="max-w-xs truncate">
+                            {transaction.description}
+                          </TableCell>
+                          <TableCell className="font-bold text-green-600">
+                            KES {transaction.amount.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">
+                            {transaction.receipt_no}
+                          </TableCell>
+                          <TableCell className="capitalize">
+                            {transaction.payment_method}
+                          </TableCell>
+                          <TableCell>
+                            <Badge 
+                              variant={
+                                transaction.status === 'verified' ? 'default' : 
+                                transaction.status === 'pending' ? 'secondary' : 'destructive'
+                              }
+                            >
+                              {transaction.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {transaction.recorded_by_name}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Income Recording Form */}
       {showIncomeForm && (
         <IncomeRecordingForm 
           onClose={() => setShowIncomeForm(false)}
           onSuccess={() => {
             setShowIncomeForm(false);
-            fetchIncomeSummary();
+            fetchIncomeData();
           }}
         />
       )}
