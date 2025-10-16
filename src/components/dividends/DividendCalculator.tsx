@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calculator, CheckCircle2 } from 'lucide-react';
+import { Calculator, CheckCircle2, TrendingUp } from 'lucide-react';
 import { auditLogger } from '@/utils/auditLogger';
 
 interface DividendCalculatorProps {
@@ -18,11 +18,8 @@ export default function DividendCalculator({ onCalculationComplete }: DividendCa
   const [loading, setLoading] = useState(false);
   const [fiscalYear, setFiscalYear] = useState(new Date().getFullYear());
   const [calculation, setCalculation] = useState({
-    registrationFees: 0,
-    finesCollected: 0,
-    loanInterest: 0,
-    investmentProfits: 0,
-    relevantExpenses: 0,
+    totalDividendIncome: 0,
+    totalRegularSavings: 0,
     totalDividendsFund: 0
   });
 
@@ -33,55 +30,29 @@ export default function DividendCalculator({ onCalculationComplete }: DividendCa
   const fetchCalculationData = async () => {
     try {
       setLoading(true);
-      const startDate = `${fiscalYear}-01-01`;
-      const endDate = `${fiscalYear}-12-31`;
 
-      const [
-        { data: contributions },
-        { data: fines },
-        { data: repayments },
-        { data: investmentProfits },
-        { data: expenses }
-      ] = await Promise.all([
-        supabase.from('contributions')
-          .select('amount')
-          .eq('is_dividend_eligible', true)
-          .gte('contribution_date', startDate)
-          .lte('contribution_date', endDate),
-        supabase.from('fines')
-          .select('paid_amount')
-          .gte('fine_date', startDate)
-          .lte('fine_date', endDate),
-        supabase.from('loan_repayments')
-          .select('interest_portion')
-          .gte('payment_date', startDate)
-          .lte('payment_date', endDate),
-        supabase.from('investment_profits')
-          .select('amount')
-          .gte('profit_date', startDate)
-          .lte('profit_date', endDate),
-        supabase.from('expenses')
-          .select('amount')
-          .eq('affects_dividends', true)
-          .gte('expense_date', startDate)
-          .lte('expense_date', endDate)
-      ]);
+      // Get total dividend-eligible income from income_records
+      const { data: incomeData } = await supabase
+        .from('yearly_income_summary')
+        .select('*')
+        .eq('fiscal_year', fiscalYear)
+        .eq('affects_dividends', true);
 
-      const registrationFees = contributions?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
-      const finesCollected = fines?.reduce((sum, f) => sum + Number(f.paid_amount || 0), 0) || 0;
-      const loanInterest = repayments?.reduce((sum, r) => sum + Number(r.interest_portion || 0), 0) || 0;
-      const investmentProfitsTotal = investmentProfits?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
-      const relevantExpenses = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+      const totalDividendIncome = incomeData?.reduce((sum, item) => sum + item.total_amount, 0) || 0;
 
-      const totalDividendsFund = registrationFees + finesCollected + loanInterest + investmentProfitsTotal - relevantExpenses;
+      // Get total regular savings (NOT dividend-eligible contributions)
+      const { data: savingsData } = await supabase
+        .from('contributions')
+        .select('amount')
+        .eq('contribution_type', 'regular')
+        .eq('fiscal_year', fiscalYear);
+
+      const totalRegularSavings = savingsData?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
 
       setCalculation({
-        registrationFees,
-        finesCollected,
-        loanInterest,
-        investmentProfits: investmentProfitsTotal,
-        relevantExpenses,
-        totalDividendsFund
+        totalDividendIncome,
+        totalRegularSavings,
+        totalDividendsFund: totalDividendIncome // Total dividend pool is the income
       });
     } catch (error: any) {
       toast({
@@ -123,17 +94,18 @@ export default function DividendCalculator({ onCalculationComplete }: DividendCa
         return;
       }
 
-      // Create dividend fund calculation
+      // Create dividend fund calculation using income data
       const { data: calcData, error: calcError } = await supabase
         .from('dividends_fund_calculations')
         .insert({
           fiscal_year: fiscalYear,
-          registration_fees: calculation.registrationFees,
-          fines_collected: calculation.finesCollected,
-          loan_interest: calculation.loanInterest,
-          investment_profits: calculation.investmentProfits,
-          relevant_expenses: calculation.relevantExpenses,
-          calculation_formula: `Registration Fees (${calculation.registrationFees}) + Fines Collected (${calculation.finesCollected}) + Loan Interest (${calculation.loanInterest}) + Investment Profits (${calculation.investmentProfits}) - Relevant Expenses (${calculation.relevantExpenses})`,
+          registration_fees: 0, // Now handled by income system
+          fines_collected: 0,   // Now handled by income system
+          loan_interest: 0,     // Now handled by income system
+          investment_profits: 0, // Now handled by income system
+          relevant_expenses: 0,  // Now handled by income system
+          total_dividends_fund: calculation.totalDividendsFund,
+          calculation_formula: `Total Dividend Income from Income Tracking System`,
           status: 'draft'
         })
         .select()
@@ -141,28 +113,28 @@ export default function DividendCalculator({ onCalculationComplete }: DividendCa
 
       if (calcError) throw calcError;
 
-      // Get all active members with their dividend-eligible contributions
+      // Get all active members with their REGULAR SAVINGS (not dividend-eligible)
       const { data: members } = await supabase
         .from('users')
-        .select('id')
+        .select('id, first_name, last_name, member_no')
         .eq('status', 'active');
 
-      const { data: contributions } = await supabase
+      // Get each member's regular savings
+      const { data: memberSavings } = await supabase
         .from('contributions')
         .select('member_id, amount')
-        .eq('is_dividend_eligible', true)
-        .gte('contribution_date', `${fiscalYear}-01-01`)
-        .lte('contribution_date', `${fiscalYear}-12-31`);
+        .eq('contribution_type', 'regular')
+        .eq('fiscal_year', fiscalYear);
 
-      const totalContributionsForDividends = contributions?.reduce((sum, c) => sum + Number(c.amount), 0) || 0;
-
-      // Calculate each member's allocation
+      // Calculate each member's allocation using YOUR FORMULA
       const allocations = members?.map(member => {
-        const memberContribution = contributions?.filter(c => c.member_id === member.id)
+        const memberRegularSavings = memberSavings
+          ?.filter(c => c.member_id === member.id)
           .reduce((sum, c) => sum + Number(c.amount), 0) || 0;
         
-        const sharePercentage = totalContributionsForDividends > 0 
-          ? parseFloat((memberContribution / totalContributionsForDividends).toFixed(4))
+        // YOUR FORMULA: (Member Regular Savings ÷ Total Regular Savings) × Total Dividend Income
+        const sharePercentage = calculation.totalRegularSavings > 0 
+          ? parseFloat((memberRegularSavings / calculation.totalRegularSavings).toFixed(4))
           : 0;
         
         const allocatedAmount = parseFloat((sharePercentage * calculation.totalDividendsFund).toFixed(2));
@@ -170,11 +142,11 @@ export default function DividendCalculator({ onCalculationComplete }: DividendCa
         return {
           calculation_id: calcData.id,
           member_id: member.id,
-          member_contribution_for_dividends: memberContribution,
-          total_contributions_for_dividends: totalContributionsForDividends,
+          member_contribution_for_dividends: memberRegularSavings,
+          total_contributions_for_dividends: calculation.totalRegularSavings,
           share_percentage: sharePercentage,
           allocated_amount: allocatedAmount,
-          calculation_notes: `${(sharePercentage * 100).toFixed(2)}% share of total dividends fund`
+          calculation_notes: `(${memberRegularSavings.toLocaleString()} / ${calculation.totalRegularSavings.toLocaleString()}) × ${calculation.totalDividendsFund.toLocaleString()} = ${allocatedAmount.toLocaleString()}`
         };
       }) || [];
 
@@ -187,12 +159,13 @@ export default function DividendCalculator({ onCalculationComplete }: DividendCa
       await auditLogger.logDataChange('create', 'dividends_fund_calculations', calcData.id, {
         fiscal_year: fiscalYear,
         total_fund: calculation.totalDividendsFund,
-        member_count: members?.length || 0
+        member_count: members?.length || 0,
+        formula_used: '(Member Regular Savings ÷ Total Regular Savings) × Total Dividend Income'
       });
 
       toast({
         title: 'Success',
-        description: `Dividends calculated successfully for ${fiscalYear}`,
+        description: `Dividends calculated successfully for ${fiscalYear} using income tracking system`,
       });
 
       onCalculationComplete();
@@ -232,26 +205,14 @@ export default function DividendCalculator({ onCalculationComplete }: DividendCa
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 p-4 bg-muted/30 rounded-lg">
             <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Registration Fees:</span>
-              <span className="font-medium">KES {calculation.registrationFees.toLocaleString()}</span>
+              <span className="text-sm text-muted-foreground">Total Dividend Income:</span>
+              <span className="font-medium">KES {calculation.totalDividendIncome.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Fines Collected:</span>
-              <span className="font-medium">KES {calculation.finesCollected.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Loan Interest:</span>
-              <span className="font-medium">KES {calculation.loanInterest.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Investment Profits:</span>
-              <span className="font-medium">KES {calculation.investmentProfits.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm text-muted-foreground">Relevant Expenses:</span>
-              <span className="font-medium text-red-600">- KES {calculation.relevantExpenses.toLocaleString()}</span>
+              <span className="text-sm text-muted-foreground">Total Regular Savings:</span>
+              <span className="font-medium">KES {calculation.totalRegularSavings.toLocaleString()}</span>
             </div>
             <div className="pt-2 border-t flex justify-between">
               <span className="font-semibold">Total Dividends Fund:</span>
@@ -259,9 +220,13 @@ export default function DividendCalculator({ onCalculationComplete }: DividendCa
             </div>
           </div>
 
+          <div className="text-sm text-muted-foreground p-3 bg-blue-50 rounded-lg">
+            <strong>Formula Used:</strong> (Member Regular Savings ÷ Total Regular Savings) × Total Dividend Income
+          </div>
+
           <Button
             onClick={handleCalculateDividends}
-            disabled={loading || calculation.totalDividendsFund <= 0}
+            disabled={loading || calculation.totalDividendsFund <= 0 || calculation.totalRegularSavings <= 0}
             className="w-full"
           >
             <CheckCircle2 className="h-4 w-4 mr-2" />

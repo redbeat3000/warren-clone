@@ -8,7 +8,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
-
+import IncomeDashboard from '@/components/income/IncomeDashboard';
 
 const queryClient = new QueryClient();
 
@@ -26,6 +26,15 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Index />
+                </ProtectedRoute>
+              } 
+            />
+            {/* Income Dashboard Route */}
+            <Route 
+              path="/income" 
+              element={
+                <ProtectedRoute>
+                  <IncomeDashboard />
                 </ProtectedRoute>
               } 
             />

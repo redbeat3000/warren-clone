@@ -17,7 +17,8 @@ import {
   CalendarDaysIcon,
   DocumentTextIcon,
   ShieldCheckIcon,
-  BellIcon
+  BellIcon,
+  ArrowTrendingUpIcon // FIXED: Changed from TrendingUpIcon to ArrowTrendingUpIcon
 } from '@heroicons/react/24/outline';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
@@ -36,6 +37,7 @@ const allNavigation = [
   { name: 'Loans', id: 'loans', icon: BanknotesIcon, roles: ['chairperson', 'treasurer', 'secretary', 'member'] },
   { name: 'Fines', id: 'fines', icon: ExclamationTriangleIcon, roles: ['chairperson', 'treasurer', 'secretary'] },
   { name: 'Expenses', id: 'expenses', icon: ArrowTrendingDownIcon, roles: ['chairperson', 'treasurer'] },
+  { name: 'Income Tracking', id: 'income', icon: ArrowTrendingUpIcon, roles: ['chairperson', 'treasurer', 'secretary'] }, // FIXED: Using ArrowTrendingUpIcon
   { name: 'Dividends', id: 'dividends', icon: ChartBarIcon, roles: ['chairperson', 'treasurer'] },
   { name: 'Meetings', id: 'meetings', icon: CalendarDaysIcon, roles: ['chairperson', 'treasurer', 'secretary'] },
   { name: 'Documents', id: 'documents', icon: DocumentTextIcon, roles: ['chairperson', 'treasurer', 'secretary'] },
