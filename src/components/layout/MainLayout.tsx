@@ -19,6 +19,7 @@ import MeetingsView from '../meetings/MeetingsView';
 import DocumentsView from '../documents/DocumentsView';
 import AuditLogsView from '../audit/AuditLogsView';
 import NotificationsView from '../notifications/NotificationsView';
+import IncomeDashboard from '../income/IncomeDashboard'; // ✅ ADD THIS IMPORT
 
 // Role-based component rendering
 const sectionComponents = {
@@ -36,6 +37,7 @@ const sectionComponents = {
   notifications: NotificationsView,
   audit: AuditLogsView,
   settings: SettingsView,
+  income: IncomeDashboard, // ✅ ADD THIS TO SECTION COMPONENTS
 };
 
 const sectionTitles = {
@@ -53,6 +55,7 @@ const sectionTitles = {
   notifications: 'Notifications & Automation',
   audit: 'Audit Trail',
   settings: 'Settings',
+  income: 'Income Tracking', // ✅ ADD THIS TITLE
 };
 
 export default function MainLayout() {
