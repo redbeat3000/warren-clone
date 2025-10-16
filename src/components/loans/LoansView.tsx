@@ -23,7 +23,7 @@ const sampleLoans = [
     memberName: 'Alice Wanjiku',
     memberNo: 'CH001',
     principal: 50000,
-    interestRate: 10,
+    interestRate: 1.5, // Changed to monthly rate (1.5% per month)
     term: 12,
     issueDate: '2024-01-01',
     balance: 35000,
@@ -37,7 +37,7 @@ const sampleLoans = [
     memberName: 'Peter Mwangi',
     memberNo: 'CH004',
     principal: 30000,
-    interestRate: 12,
+    interestRate: 2, // Changed to monthly rate (2% per month)
     term: 6,
     issueDate: '2023-12-15',
     balance: 5000,
@@ -51,7 +51,7 @@ const sampleLoans = [
     memberName: 'Mary Njoki',
     memberNo: 'CH003',
     principal: 25000,
-    interestRate: 10,
+    interestRate: 1.5, // Changed to monthly rate (1.5% per month)
     term: 8,
     issueDate: '2023-11-01',
     balance: 8000,
@@ -111,15 +111,17 @@ export default function LoansView() {
         ) || 0;
 
         const principal = parseFloat(loan.principal);
-        const interestRate = parseFloat(loan.interest_rate);
+        const interestRate = parseFloat(loan.interest_rate); // Now this is monthly rate
         const termMonths = loan.term_months;
         
-        // Calculate interest based on interest type
+        // Calculate interest based on interest type - NOW USING MONTHLY RATES
         let totalInterest = 0;
         if (loan.interest_type === 'flat') {
-          totalInterest = (principal * interestRate * termMonths) / (100 * 12);
-        } else { // declining balance
-          const monthlyRate = interestRate / 100 / 12;
+          // Flat interest: principal * monthly_rate * term_months
+          totalInterest = principal * (interestRate / 100) * termMonths;
+        } else { 
+          // Declining balance (amortization)
+          const monthlyRate = interestRate / 100; // Monthly rate as decimal
           const totalPayment = principal * (monthlyRate * Math.pow(1 + monthlyRate, termMonths)) / (Math.pow(1 + monthlyRate, termMonths) - 1);
           totalInterest = (totalPayment * termMonths) - principal;
         }
@@ -136,7 +138,7 @@ export default function LoansView() {
           memberName: `${loan.users.first_name} ${loan.users.last_name}`,
           memberNo: loan.users.member_no || 'N/A',
           principal: principal,
-          interestRate: interestRate,
+          interestRate: interestRate, // Monthly rate
           term: termMonths,
           issueDate: loan.issue_date,
           balance: outstandingBalance,
@@ -144,7 +146,9 @@ export default function LoansView() {
           nextPayment: loan.due_date,
           status: isOverdue ? 'overdue' : loan.status,
           interestType: loan.interest_type,
-          outstandingBalance: outstandingBalance
+          outstandingBalance: outstandingBalance,
+          // Add annual equivalent for display if needed
+          annualEquivalentRate: (interestRate * 12).toFixed(1)
         };
       });
 
@@ -364,7 +368,12 @@ export default function LoansView() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-foreground">KES {loan.principal.toLocaleString()}</div>
-                    <div className="text-sm text-muted-foreground">{loan.interestRate}% • {loan.term}m</div>
+                    <div className="text-sm text-muted-foreground">
+                      {loan.interestRate}% monthly • {loan.term}m
+                      {loan.annualEquivalentRate && (
+                        <span className="text-xs"> ({loan.annualEquivalentRate}% annual)</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-foreground">KES {loan.balance.toLocaleString()}</div>
