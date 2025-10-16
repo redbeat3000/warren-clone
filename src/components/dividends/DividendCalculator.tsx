@@ -56,22 +56,50 @@ export default function DividendCalculator({ onCalculationComplete, onClose }: D
     try {
       setLoading(true);
 
-      // Get all dividend-eligible income that's automatically tracked
-      const { data: incomeData, error: incomeError } = await supabase
-        .from('yearly_income_summary')
-        .select('*')
-        .eq('fiscal_year', fiscalYear)
-        .eq('affects_dividends', true);
+      // Get registration fees (dividend-eligible contributions)
+      const { data: registrationFees, error: regError } = await supabase
+        .from('contributions')
+        .select('amount')
+        .eq('is_dividend_eligible', true)
+        .gte('contribution_date', `${fiscalYear}-01-01`)
+        .lte('contribution_date', `${fiscalYear}-12-31`);
 
-      if (incomeError) throw incomeError;
+      if (regError) throw regError;
 
-      // Calculate income breakdown by category
+      // Get fines collected
+      const { data: finesData, error: finesError } = await supabase
+        .from('fines')
+        .select('paid_amount')
+        .gte('fine_date', `${fiscalYear}-01-01`)
+        .lte('fine_date', `${fiscalYear}-12-31`);
+
+      if (finesError) throw finesError;
+
+      // Get loan interest
+      const { data: loanInterestData, error: loanError } = await supabase
+        .from('loan_repayments')
+        .select('interest_portion')
+        .gte('payment_date', `${fiscalYear}-01-01`)
+        .lte('payment_date', `${fiscalYear}-12-31`);
+
+      if (loanError) throw loanError;
+
+      // Get investment profits
+      const { data: investmentData, error: investError } = await supabase
+        .from('investment_profits')
+        .select('amount')
+        .gte('profit_date', `${fiscalYear}-01-01`)
+        .lte('profit_date', `${fiscalYear}-12-31`);
+
+      if (investError) throw investError;
+
+      // Calculate income breakdown
       const incomeBreakdown = {
-        registration_fees: incomeData?.find(item => item.category_name === 'registration_fees')?.total_amount || 0,
-        loan_interest: incomeData?.find(item => item.category_name === 'loan_interest')?.total_amount || 0,
-        fines_penalties: incomeData?.find(item => item.category_name === 'fines_penalties')?.total_amount || 0,
-        investment_income: incomeData?.find(item => item.category_name === 'investment_income')?.total_amount || 0,
-        other_income: incomeData?.find(item => item.category_name === 'other_income')?.total_amount || 0
+        registration_fees: registrationFees?.reduce((sum, r) => sum + Number(r.amount), 0) || 0,
+        loan_interest: loanInterestData?.reduce((sum, l) => sum + Number(l.interest_portion || 0), 0) || 0,
+        fines_penalties: finesData?.reduce((sum, f) => sum + Number(f.paid_amount || 0), 0) || 0,
+        investment_income: investmentData?.reduce((sum, i) => sum + Number(i.amount), 0) || 0,
+        other_income: 0
       };
 
       const totalIncome = Object.values(incomeBreakdown).reduce((sum, amount) => sum + amount, 0);

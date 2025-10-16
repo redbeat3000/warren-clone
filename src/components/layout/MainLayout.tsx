@@ -19,7 +19,8 @@ import MeetingsView from '../meetings/MeetingsView';
 import DocumentsView from '../documents/DocumentsView';
 import AuditLogsView from '../audit/AuditLogsView';
 import NotificationsView from '../notifications/NotificationsView';
-import IncomeDashboard from '../income/IncomeDashboard'; // ✅ ADD THIS IMPORT
+import IncomeDashboard from '../income/IncomeDashboard';
+import FinancialAuditTrailView from '../audit/FinancialAuditTrailView';
 
 // Role-based component rendering
 const sectionComponents = {
@@ -36,8 +37,9 @@ const sectionComponents = {
   messages: MessagesView,
   notifications: NotificationsView,
   audit: AuditLogsView,
+  'financial-audit': FinancialAuditTrailView,
   settings: SettingsView,
-  income: IncomeDashboard, // ✅ ADD THIS TO SECTION COMPONENTS
+  income: IncomeDashboard,
 };
 
 const sectionTitles = {
@@ -54,8 +56,9 @@ const sectionTitles = {
   messages: 'Messages',
   notifications: 'Notifications & Automation',
   audit: 'Audit Trail',
+  'financial-audit': 'Financial Audit Trail',
   settings: 'Settings',
-  income: 'Income Tracking', // ✅ ADD THIS TITLE
+  income: 'Income Tracking',
 };
 
 export default function MainLayout() {

@@ -18,7 +18,8 @@ import {
   DocumentTextIcon,
   ShieldCheckIcon,
   BellIcon,
-  ArrowTrendingUpIcon // FIXED: Changed from TrendingUpIcon to ArrowTrendingUpIcon
+  ArrowTrendingUpIcon,
+  DocumentChartBarIcon
 } from '@heroicons/react/24/outline';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
@@ -45,6 +46,7 @@ const allNavigation = [
   { name: 'Messages', id: 'messages', icon: ChatBubbleLeftRightIcon, roles: ['chairperson', 'secretary'] },
   { name: 'Notifications', id: 'notifications', icon: BellIcon, roles: ['chairperson', 'treasurer', 'secretary'] },
   { name: 'Audit Logs', id: 'audit', icon: ShieldCheckIcon, roles: ['chairperson'] },
+  { name: 'Financial Audit Trail', id: 'financial-audit', icon: DocumentChartBarIcon, roles: ['chairperson', 'treasurer'] },
   { name: 'Settings', id: 'settings', icon: Cog6ToothIcon, roles: ['chairperson'] },
 ];
 

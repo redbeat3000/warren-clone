@@ -69,20 +69,27 @@ export default function DividendsView() {
     const currentYear = new Date().getFullYear();
     
     try {
-      const [{ data: incomeData }, { data: expenseData }] = await Promise.all([
-        supabase
-          .from('yearly_income_summary')
-          .select('total_amount')
-          .eq('fiscal_year', currentYear)
-          .eq('affects_dividends', true),
-        supabase
-          .from('expenses')
-          .select('amount')
-          .eq('fiscal_year', currentYear)
-          .eq('affects_dividends', true)
+      // Get dividend-eligible income sources
+      const [
+        { data: registrationFees },
+        { data: fines },
+        { data: loanInterest },
+        { data: investmentProfits },
+        { data: expenseData }
+      ] = await Promise.all([
+        supabase.from('contributions').select('amount').eq('is_dividend_eligible', true).gte('contribution_date', `${currentYear}-01-01`).lte('contribution_date', `${currentYear}-12-31`),
+        supabase.from('fines').select('paid_amount').gte('fine_date', `${currentYear}-01-01`).lte('fine_date', `${currentYear}-12-31`),
+        supabase.from('loan_repayments').select('interest_portion').gte('payment_date', `${currentYear}-01-01`).lte('payment_date', `${currentYear}-12-31`),
+        supabase.from('investment_profits').select('amount').gte('profit_date', `${currentYear}-01-01`).lte('profit_date', `${currentYear}-12-31`),
+        supabase.from('expenses').select('amount').gte('expense_date', `${currentYear}-01-01`).lte('expense_date', `${currentYear}-12-31`).eq('affects_dividends', true)
       ]);
 
-      const totalIncome = incomeData?.reduce((sum, item) => sum + item.total_amount, 0) || 0;
+      const totalIncome = 
+        (registrationFees?.reduce((sum, r) => sum + Number(r.amount), 0) || 0) +
+        (fines?.reduce((sum, f) => sum + Number(f.paid_amount || 0), 0) || 0) +
+        (loanInterest?.reduce((sum, l) => sum + Number(l.interest_portion || 0), 0) || 0) +
+        (investmentProfits?.reduce((sum, i) => sum + Number(i.amount), 0) || 0);
+      
       const totalExpenses = expenseData?.reduce((sum, expense) => sum + Number(expense.amount), 0) || 0;
       const netProfit = Math.max(0, totalIncome - totalExpenses);
 
