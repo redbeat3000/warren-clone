@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Calculator, CheckCircle2, TrendingUp, Minus, Equal, AlertCircle, Receipt, CreditCard, Scale, Investment, X } from 'lucide-react';
+import { Calculator, CheckCircle2, TrendingUp, Minus, Equal, AlertCircle, Receipt, CreditCard, Scale, X, BarChart3 } from 'lucide-react';
 import { auditLogger } from '@/utils/auditLogger';
 
 interface DividendCalculatorProps {
@@ -272,7 +272,7 @@ export default function DividendCalculator({ onCalculationComplete, onClose }: D
       case 'registration_fees': return <Receipt className="h-4 w-4" />;
       case 'loan_interest': return <CreditCard className="h-4 w-4" />;
       case 'fines_penalties': return <Scale className="h-4 w-4" />;
-      case 'investment_income': return <Investment className="h-4 w-4" />;
+      case 'investment_income': return <BarChart3 className="h-4 w-4" />;
       default: return <TrendingUp className="h-4 w-4" />;
     }
   };
