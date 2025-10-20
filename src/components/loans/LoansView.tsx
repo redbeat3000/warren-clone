@@ -12,6 +12,7 @@ import {
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import AddLoanForm from './AddLoanForm';
 import LoanRepaymentDialog from './LoanRepaymentDialog';
+import LoanViewDialog from './LoanViewDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { generateLoansReportPDF } from '@/utils/pdfGenerator';
 
@@ -66,6 +67,7 @@ export default function LoansView() {
   const [isAddLoanOpen, setIsAddLoanOpen] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState<any>(null);
   const [isRepaymentOpen, setIsRepaymentOpen] = useState(false);
+  const [isViewOpen, setIsViewOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [loans, setLoans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -401,9 +403,9 @@ export default function LoansView() {
                         className="p-1 hover:bg-secondary rounded transition-colors"
                         onClick={() => {
                           setSelectedLoan(loan);
-                          setIsRepaymentOpen(true);
+                          setIsViewOpen(true);
                         }}
-                        title="Record Repayment"
+                        title="View Loan Details"
                       >
                         <EyeIcon className="h-4 w-4 text-muted-foreground" />
                       </button>
@@ -416,14 +418,13 @@ export default function LoansView() {
         </div>
       </motion.div>
 
-      <LoanRepaymentDialog
+      <LoanViewDialog
         loan={selectedLoan}
-        open={isRepaymentOpen}
+        open={isViewOpen}
         onClose={() => {
-          setIsRepaymentOpen(false);
+          setIsViewOpen(false);
           setSelectedLoan(null);
         }}
-        onSuccess={fetchLoans}
       />
     </div>
   );

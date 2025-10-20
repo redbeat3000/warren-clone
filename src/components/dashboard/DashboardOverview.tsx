@@ -63,7 +63,10 @@ export default function DashboardOverview() {
     'amount, contribution_date', 
     []
   );
-  const { data: loans } = useSupabaseQuery('loans', 'status', []);
+  const { data: loans } = useSupabaseQuery('loans', 'status, issue_date, principal', []);
+  const { data: loanInterest } = useSupabaseQuery('loan_repayments', 'interest_portion', []);
+  const { data: fines } = useSupabaseQuery('fines', 'paid_amount', []);
+  const { data: allContributions } = useSupabaseQuery('contributions', 'amount, contribution_type', []);
   const { data: recentActivity } = useSupabaseQuery(
     'contributions', 
     '*, users!inner(first_name, last_name)', 
@@ -80,11 +83,20 @@ export default function DashboardOverview() {
     { amount: 5300, contribution_date: '2024-06-15' }
   ];
 
+  // Calculate Available Cash: Loan Interest + Registration Fees + Fines (not principal or expenses)
+  const availableCashCalculated = React.useMemo(() => {
+    const totalLoanInterest = (loanInterest || []).reduce((sum, r: any) => sum + parseFloat(r.interest_portion || 0), 0);
+    const totalFines = (fines || []).reduce((sum, f: any) => sum + parseFloat(f.paid_amount || 0), 0);
+    const registrationFees = (allContributions || []).filter((c: any) => c.contribution_type === 'registration_fee');
+    const totalRegFees = registrationFees.reduce((sum, c: any) => sum + parseFloat(c.amount || 0), 0);
+    return totalLoanInterest + totalFines + totalRegFees;
+  }, [loanInterest, fines, allContributions]);
+
   const sampleLoans = [
-    { status: 'active' },
-    { status: 'active' },
-    { status: 'overdue' },
-    { status: 'pending' }
+    { status: 'active', issue_date: '2023-11-01', principal: 50000 },
+    { status: 'active', issue_date: '2023-12-15', principal: 30000 },
+    { status: 'overdue', issue_date: '2024-01-01', principal: 25000 },
+    { status: 'pending', issue_date: '2024-01-15', principal: 40000 }
   ];
 
   const sampleActivity = [
@@ -123,6 +135,19 @@ export default function DashboardOverview() {
     return Object.entries(monthlyData).map(([month, amount]) => ({ month, amount }));
   }, [activeContributions]);
 
+  // Process loans over time for line chart
+  const loansOverTime = React.useMemo(() => {
+    if (!activeLoans.length) return [];
+    
+    const monthlyData: { [key: string]: number } = {};
+    activeLoans.forEach((loan: any) => {
+      const month = new Date(loan.issue_date).toLocaleDateString('en', { month: 'short', year: '2-digit' });
+      monthlyData[month] = (monthlyData[month] || 0) + 1;
+    });
+    
+    return Object.entries(monthlyData).map(([month, count]) => ({ month, count }));
+  }, [activeLoans]);
+
   // Process loan distribution
   const loanDistribution = React.useMemo(() => {
     const statusCounts = activeLoans.reduce((acc: any, loan: any) => {
@@ -154,7 +179,7 @@ export default function DashboardOverview() {
     },
     {
       name: 'Available Cash',
-      value: `KES ${stats.availableCash.toLocaleString()}`,
+      value: `KES ${availableCashCalculated.toLocaleString()}`,
       change: '+12%',
       changeType: 'increase',
       icon: CurrencyDollarIcon,
@@ -179,7 +204,7 @@ export default function DashboardOverview() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
           <p className="text-muted-foreground mt-1">
-            Welcome back! Here's what's happening with your Chama.
+            Welcome back! Here's what's happening with Kamandoto SHG.
           </p>
         </div>
         <motion.button
@@ -249,41 +274,38 @@ export default function DashboardOverview() {
           </div>
         </motion.div>
 
-        {/* Loan Distribution */}
+        {/* Loans Issued Over Time */}
         <motion.div
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.6 }}
           className="card-elevated p-6"
         >
-          <h3 className="text-lg font-semibold text-foreground mb-6">Loan Status Distribution</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-6">Loans Issued Over Time</h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={loanDistribution}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {loanDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
+              <LineChart data={loansOverTime}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <XAxis dataKey="month" stroke="#6B7280" />
+                <YAxis stroke="#6B7280" />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'white', 
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                  }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="count" 
+                  stroke="#3B82F6" 
+                  strokeWidth={3}
+                  dot={{ fill: '#3B82F6', r: 4 }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
             </ResponsiveContainer>
-          </div>
-          <div className="flex justify-center space-x-6 mt-4">
-            {loanDistribution.map((item) => (
-              <div key={item.name} className="flex items-center space-x-2">
-                <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                <span className="text-sm text-muted-foreground">{item.name} ({item.value})</span>
-              </div>
-            ))}
           </div>
         </motion.div>
       </div>

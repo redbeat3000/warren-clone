@@ -38,12 +38,8 @@ const allNavigation = [
   { name: 'Loans', id: 'loans', icon: BanknotesIcon, roles: ['chairperson', 'treasurer', 'secretary', 'member'] },
   { name: 'Fines', id: 'fines', icon: ExclamationTriangleIcon, roles: ['chairperson', 'treasurer', 'secretary'] },
   { name: 'Expenses', id: 'expenses', icon: ArrowTrendingDownIcon, roles: ['chairperson', 'treasurer'] },
-  { name: 'Income Tracking', id: 'income', icon: ArrowTrendingUpIcon, roles: ['chairperson', 'treasurer', 'secretary'] }, // FIXED: Using ArrowTrendingUpIcon
-  { name: 'Dividends', id: 'dividends', icon: ChartBarIcon, roles: ['chairperson', 'treasurer'] },
-  { name: 'Meetings', id: 'meetings', icon: CalendarDaysIcon, roles: ['chairperson', 'treasurer', 'secretary'] },
-  { name: 'Documents', id: 'documents', icon: DocumentTextIcon, roles: ['chairperson', 'treasurer', 'secretary'] },
+  { name: 'Income Tracking', id: 'income', icon: ArrowTrendingUpIcon, roles: ['chairperson', 'treasurer', 'secretary'] },
   { name: 'Reports', id: 'reports', icon: ClipboardDocumentListIcon, roles: ['chairperson', 'treasurer', 'secretary'] },
-  { name: 'Messages', id: 'messages', icon: ChatBubbleLeftRightIcon, roles: ['chairperson', 'secretary'] },
   { name: 'Notifications', id: 'notifications', icon: BellIcon, roles: ['chairperson', 'treasurer', 'secretary'] },
   { name: 'Audit Logs', id: 'audit', icon: ShieldCheckIcon, roles: ['chairperson'] },
   { name: 'Financial Audit Trail', id: 'financial-audit', icon: DocumentChartBarIcon, roles: ['chairperson', 'treasurer'] },
@@ -75,9 +71,9 @@ export default function Sidebar({ activeSection, onSectionChange }: SidebarProps
           className="flex items-center space-x-3"
         >
           <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-lg">C</span>
+            <span className="text-primary-foreground font-bold text-lg">K</span>
           </div>
-          <span className="text-lg font-semibold text-sidebar-foreground">Chama</span>
+          <span className="text-lg font-semibold text-sidebar-foreground">Kamandoto SHG</span>
         </motion.div>
       </div>
 

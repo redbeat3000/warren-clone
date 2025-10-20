@@ -219,7 +219,7 @@ export default function ReportsView() {
       >
         <div>
           <h1 className="text-3xl font-bold text-foreground">Reports & Analytics</h1>
-          <p className="text-muted-foreground mt-1">Generate comprehensive reports for your Chama</p>
+          <p className="text-muted-foreground mt-1">Generate comprehensive reports for Kamandoto SHG</p>
         </div>
         <motion.button
           whileHover={{ scale: 1.02 }}

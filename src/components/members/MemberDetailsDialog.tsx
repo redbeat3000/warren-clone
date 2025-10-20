@@ -71,7 +71,13 @@ export default function MemberDetailsDialog({ member, open, onClose }: MemberDet
         dividends: dividends.data || []
       };
 
-      generateMemberReportPDF(memberData, financialData);
+      generateMemberReportPDF(
+        memberData, 
+        contributions.data || [], 
+        loans.data || [],
+        repayments.data || [],
+        fines.data || []
+      );
     } catch (error) {
       console.error('Error generating member report:', error);
     }
@@ -97,7 +103,7 @@ export default function MemberDetailsDialog({ member, open, onClose }: MemberDet
         <div className="flex items-center justify-between">
           <DialogTitle>Member Details</DialogTitle>
           <Button onClick={handleDownloadReport} size="sm" variant="outline">
-            <Download className="h-4 w-4 mr-2" />
+            <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
             Download Report
           </Button>
         </div>

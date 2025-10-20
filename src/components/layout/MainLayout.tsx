@@ -30,11 +30,7 @@ const sectionComponents = {
   loans: LoansView,
   fines: FinesView,
   expenses: ExpensesView,
-  dividends: DividendsView,
-  meetings: MeetingsView,
-  documents: DocumentsView,
   reports: ReportsView,
-  messages: MessagesView,
   notifications: NotificationsView,
   audit: AuditLogsView,
   'financial-audit': FinancialAuditTrailView,
@@ -49,11 +45,7 @@ const sectionTitles = {
   loans: 'Loans',
   fines: 'Fines',
   expenses: 'Expenses',
-  dividends: 'Dividends',
-  meetings: 'Meetings & Events',
-  documents: 'Document Management',
   reports: 'Reports & Analytics',
-  messages: 'Messages',
   notifications: 'Notifications & Automation',
   audit: 'Audit Trail',
   'financial-audit': 'Financial Audit Trail',
@@ -97,7 +89,7 @@ export default function MainLayout() {
             <Sidebar activeSection="dashboard" onSectionChange={setActiveSection} />
           </div>
           <div className="flex-1 flex flex-col min-w-0">
-            <Header title="Access Denied" subtitle="Chama Management System" />
+            <Header title="Access Denied" subtitle="Kamandoto SHG Management System" />
             <main className="flex-1 overflow-auto">
               <div className="p-6">
                 <div className="text-center">
@@ -152,7 +144,7 @@ export default function MainLayout() {
         <div className="flex-1 flex flex-col min-w-0">
           <Header 
             title={sectionTitles[activeSection as keyof typeof sectionTitles]}
-            subtitle="Chama Management System"
+            subtitle="Kamandoto SHG Management System"
           />
           
           <main className="flex-1 overflow-auto">
