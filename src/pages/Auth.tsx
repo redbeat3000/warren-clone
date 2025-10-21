@@ -70,9 +70,9 @@ const Auth = () => {
         />
         <div className="absolute inset-0 bg-primary/20 flex flex-col justify-end p-12">
           <div className="text-white">
-            <h1 className="text-4xl font-bold mb-4">Chama Management System</h1>
+            <h1 className="text-4xl font-bold mb-4">Kamandoto SHG Management System</h1>
             <p className="text-xl opacity-90">
-              Empowering financial communities through seamless management and collaboration.
+              Empowering Kamandoto Self-Help Group through seamless management and collaboration.
             </p>
           </div>
         </div>

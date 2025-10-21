@@ -11,7 +11,6 @@ import {
 } from '@heroicons/react/24/outline';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import AddLoanForm from './AddLoanForm';
-import LoanRepaymentDialog from './LoanRepaymentDialog';
 import LoanViewDialog from './LoanViewDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { generateLoansReportPDF } from '@/utils/pdfGenerator';
@@ -66,7 +65,6 @@ export default function LoansView() {
   const [filter, setFilter] = useState('all');
   const [isAddLoanOpen, setIsAddLoanOpen] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState<any>(null);
-  const [isRepaymentOpen, setIsRepaymentOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [loans, setLoans] = useState<any[]>([]);

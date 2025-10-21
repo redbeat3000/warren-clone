@@ -176,7 +176,7 @@ export default function ContributionsView() {
                 <span>Record Contribution</span>
               </motion.button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <AddContributionForm 
                 onSuccess={() => setRefreshKey(prev => prev + 1)} 
                 onClose={() => setIsAddContributionOpen(false)} 

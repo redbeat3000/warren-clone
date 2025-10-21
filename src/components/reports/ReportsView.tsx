@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   DocumentTextIcon,
@@ -6,208 +6,408 @@ import {
   CalendarDaysIcon,
   ArrowDownTrayIcon,
   EyeIcon,
-  PrinterIcon
+  PrinterIcon,
+  FunnelIcon,
+  XMarkIcon,
+  MagnifyingGlassIcon,
+  DocumentArrowDownIcon
 } from '@heroicons/react/24/outline';
-import { useFinancialData } from '@/hooks/useFinancialData';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-// Sample reports data
-const availableReports = [
-  {
-    id: '1',
-    name: 'Monthly Financial Statement',
-    description: 'Comprehensive financial overview including contributions, loans, and expenses',
-    category: 'Financial',
-    frequency: 'Monthly',
-    lastGenerated: '2024-01-31',
-    format: 'PDF',
-    icon: ChartBarIcon
-  },
-  {
-    id: '2',
-    name: 'Member Contribution Summary',
-    description: 'Individual member contribution history and totals',
-    category: 'Members',
-    frequency: 'On-demand',
-    lastGenerated: '2024-01-28',
-    format: 'Excel',
-    icon: DocumentTextIcon
-  },
-  {
-    id: '3',
-    name: 'Loan Portfolio Report',
-    description: 'Active loans, repayment schedules, and overdue accounts',
-    category: 'Loans',
-    frequency: 'Weekly',
-    lastGenerated: '2024-01-29',
-    format: 'PDF',
-    icon: ChartBarIcon
-  },
-  {
-    id: '4',
-    name: 'Cash Flow Statement',
-    description: 'Money in and out, including all transactions and balances',
-    category: 'Financial',
-    frequency: 'Monthly',
-    lastGenerated: '2024-01-30',
-    format: 'PDF',
-    icon: DocumentTextIcon
-  },
-  {
-    id: '5',
-    name: 'Dividend Distribution Report',
-    description: 'Dividend calculations and member allocations',
-    category: 'Dividends',
-    frequency: 'Quarterly',
-    lastGenerated: '2024-01-15',
-    format: 'Excel',
-    icon: ChartBarIcon
-  },
-  {
-    id: '6',
-    name: 'Fines & Penalties Report',
-    description: 'Outstanding fines, payment history, and penalty tracking',
-    category: 'Fines',
-    frequency: 'On-demand',
-    lastGenerated: '2024-01-25',
-    format: 'PDF',
-    icon: DocumentTextIcon
-  }
-];
-
-const reportCategories = ['All', 'Financial', 'Members', 'Loans', 'Dividends', 'Fines'];
+interface FinancialTransaction {
+  id: string;
+  timestamp: string;
+  actionType: string;
+  member: string;
+  amount: number;
+  paymentMethod: string;
+  previousBalance: number;
+  newBalance: number;
+  authorizingOfficer: string;
+  referenceNumber: string;
+  description: string;
+  type: 'income' | 'expense' | 'loan' | 'contribution' | 'fine';
+}
 
 export default function ReportsView() {
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
-  const { summary, loading, exportToPDF, generateReport } = useFinancialData();
+  const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
+  const [filteredTransactions, setFilteredTransactions] = useState<FinancialTransaction[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Filter states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedType, setSelectedType] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [minAmount, setMinAmount] = useState('');
+  const [maxAmount, setMaxAmount] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [showFilters, setShowFilters] = useState(false);
+  const [fundType, setFundType] = useState('all');
+  const [moneyFlow, setMoneyFlow] = useState<'in' | 'out' | 'all'>('all');
+  const [reportType, setReportType] = useState<'individual' | 'collective'>('collective');
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
 
-  const filteredReports = availableReports.filter(report => 
-    selectedCategory === 'All' || report.category === selectedCategory
-  );
+  const transactionTypes = [
+    { value: 'all', label: 'All Transactions' },
+    { value: 'contributions', label: 'Contributions' },
+    { value: 'loans', label: 'Loans' },
+    { value: 'loan_repayments', label: 'Loan Repayments' },
+    { value: 'expenses', label: 'Expenses' },
+    { value: 'fines', label: 'Fines' },
+    { value: 'income', label: 'Income' }
+  ];
 
-  const handleGenerateReport = async (reportId: string) => {
-    if (!summary) return;
+  const contributionTypes = [
+    { value: 'regular', label: 'Regular Contributions' },
+    { value: 'fines', label: 'Fine Payments' },
+    { value: 'loan_repayments', label: 'Loan Repayments' }
+  ];
 
+  const fundTypes = [
+    { value: 'all', label: 'All Funds' },
+    { value: 'regular', label: 'Regular Savings' },
+    { value: 'xmas_savings', label: 'Christmas Savings' },
+    { value: 'land_fund', label: 'Land Fund' },
+    { value: 'security_fund', label: 'Security Fund' },
+    { value: 'registration_fee', label: 'Registration Fees' }
+  ];
+
+  const moneyFlowOptions = [
+    { value: 'all', label: 'All Transactions' },
+    { value: 'in', label: 'Money In (Income)' },
+    { value: 'out', label: 'Money Out (Expenses)' }
+  ];
+
+  const quickPresets = [
+    { label: 'Today', days: 0 },
+    { label: 'This Week', days: 7 },
+    { label: 'This Month', days: 30 },
+    { label: 'Last 3 Months', days: 90 },
+    { label: 'This Year', days: 365 }
+  ];
+
+  useEffect(() => {
+    fetchFinancialTransactions();
+  }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [transactions, searchTerm, selectedType, dateFrom, dateTo, minAmount, maxAmount, selectedCategories, sortBy, sortOrder, fundType, moneyFlow]);
+
+  const fetchFinancialTransactions = async () => {
     try {
-      const { supabase } = await import('@/integrations/supabase/client');
-      const selectedDate = new Date(selectedMonth);
-      const startDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1).toISOString();
-      const endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0, 23, 59, 59).toISOString();
+      setLoading(true);
+      
+      // Fetch all financial transactions from different sources
+      const [
+        { data: contributions },
+        { data: loans },
+        { data: repayments },
+        { data: expenses },
+        { data: fines }
+      ] = await Promise.all([
+        supabase.from('contributions').select('*, users!contributions_member_id_fkey(first_name, last_name, member_no)').order('contribution_date', { ascending: false }),
+        supabase.from('loans').select('*, users!loans_member_id_fkey(first_name, last_name, member_no)').order('issue_date', { ascending: false }),
+        supabase.from('loan_repayments').select('*, users!loan_repayments_member_id_fkey(first_name, last_name, member_no)').order('payment_date', { ascending: false }),
+        supabase.from('expenses').select('*').order('expense_date', { ascending: false }),
+        supabase.from('fines').select('*, users!fines_member_id_fkey(first_name, last_name, member_no)').order('fine_date', { ascending: false })
+      ]);
 
-      switch (reportId) {
-        case '1': // Monthly Financial Statement
-          const financialData = [
-            { metric: 'Total Contributions', amount: summary.totalContributions },
-            { metric: 'Total Loans', amount: summary.totalLoans },
-            { metric: 'Total Expenses', amount: summary.totalExpenses },
-            { metric: 'Available Cash', amount: summary.availableCash }
-          ];
-          exportToPDF(financialData, `financial-statement-${selectedMonth}`);
-          break;
-        
-        case '2': // Member Contribution Summary
-          const { data: contributions } = await supabase
-            .from('contributions')
-            .select('*, users!inner(first_name, last_name, member_no)')
-            .gte('contribution_date', startDate)
-            .lte('contribution_date', endDate);
-          
-          if (contributions) {
-            const { generateContributionsPDF } = await import('@/utils/pdfGenerator');
-            const formattedContribs = contributions.map((c: any) => ({
-              receiptNo: c.receipt_no || 'N/A',
-              memberName: `${c.users.first_name} ${c.users.last_name}`,
-              memberNo: c.users.member_no,
-              amount: parseFloat(c.amount),
-              date: c.contribution_date,
-              paymentMethod: c.payment_method || 'Cash',
-              status: 'Paid'
-            }));
-            generateContributionsPDF(formattedContribs);
-          }
-          break;
-          
-        case '3': // Loan Portfolio Report
-          const { data: loans } = await supabase
-            .from('loans')
-            .select('*, users!inner(first_name, last_name, member_no)')
-            .gte('issue_date', startDate)
-            .lte('issue_date', endDate);
-          
-          if (loans) {
-            const { generateLoansReportPDF } = await import('@/utils/pdfGenerator');
-            const formattedLoans = loans.map((l: any) => ({
-              loanNo: `L${l.id.slice(0, 8)}`,
-              memberName: `${l.users.first_name} ${l.users.last_name}`,
-              principal: parseFloat(l.principal),
-              balance: parseFloat(l.principal), // TODO: Calculate actual balance
-              interestRate: l.interest_rate,
-              term: l.term_months,
-              status: l.status
-            }));
-            generateLoansReportPDF(formattedLoans);
-          }
-          break;
-          
-        case '4': // Cash Flow Statement
-          exportToPDF(summary.memberBalances, `cash-flow-${selectedMonth}`);
-          break;
-          
-        case '5': // Dividend Distribution Report
-          const { data: dividends } = await supabase
-            .from('dividends')
-            .select('*')
-            .gte('created_at', startDate)
-            .lte('created_at', endDate);
-          
-          if (dividends && dividends.length > 0) {
-            const { generateDividendsReportPDF } = await import('@/utils/pdfGenerator');
-            const formattedDividends = dividends.map((d: any) => ({
-              year: new Date(d.created_at).getFullYear(),
-              period: d.period,
-              totalAmount: parseFloat(d.allocation_amount || 0),
-              perShare: 0,
-              shares: 0,
-              dateDistributed: d.payout_date,
-              status: d.payout_date ? 'distributed' : 'calculated'
-            }));
-            generateDividendsReportPDF(formattedDividends, []);
-          }
-          break;
-          
-        case '6': // Fines & Penalties Report
-          const { data: fines } = await supabase
-            .from('fines')
-            .select('*, users!inner(first_name, last_name, member_no)')
-            .gte('fine_date', startDate)
-            .lte('fine_date', endDate);
-          
-          if (fines) {
-            const { generateFinesReportPDF } = await import('@/utils/pdfGenerator');
-            const formattedFines = fines.map((f: any) => ({
-              fineNo: `F${f.id.slice(0, 8)}`,
-              memberName: `${f.users.first_name} ${f.users.last_name}`,
-              reason: f.reason || 'N/A',
-              amount: parseFloat(f.amount),
-              dueDate: f.fine_date,
-              status: f.status
-            }));
-            generateFinesReportPDF(formattedFines);
-          }
-          break;
-      }
+      const allTransactions: FinancialTransaction[] = [];
+
+      // Process contributions
+      contributions?.forEach(c => {
+        allTransactions.push({
+          id: c.id,
+          timestamp: c.contribution_date,
+          actionType: 'CONTRIBUTION_RECEIVED',
+          member: c.users ? `${c.users.first_name} ${c.users.last_name} (${c.users.member_no})` : 'Unknown',
+          amount: Number(c.amount),
+          paymentMethod: c.payment_method || 'Cash',
+          previousBalance: 0,
+          newBalance: 0,
+          authorizingOfficer: 'System',
+          referenceNumber: c.receipt_no || `CONT-${c.id.substring(0, 8)}`,
+          description: c.notes,
+          type: 'contribution'
+        });
+      });
+
+      // Process loans
+      loans?.forEach(l => {
+        allTransactions.push({
+          id: l.id,
+          timestamp: l.issue_date,
+          actionType: 'LOAN_DISBURSED',
+          member: l.users ? `${l.users.first_name} ${l.users.last_name} (${l.users.member_no})` : 'Unknown',
+          amount: Number(l.principal),
+          paymentMethod: 'Bank Transfer',
+          previousBalance: 0,
+          newBalance: 0,
+          authorizingOfficer: 'System',
+          referenceNumber: `LOAN-${l.id.substring(0, 8)}`,
+          description: l.notes,
+          type: 'loan'
+        });
+      });
+
+      // Process loan repayments
+      repayments?.forEach(r => {
+        allTransactions.push({
+          id: r.id,
+          timestamp: r.payment_date,
+          actionType: 'LOAN_REPAYMENT_RECEIVED',
+          member: r.users ? `${r.users.first_name} ${r.users.last_name} (${r.users.member_no})` : 'Unknown',
+          amount: Number(r.amount),
+          paymentMethod: r.payment_method || 'Cash',
+          previousBalance: 0,
+          newBalance: 0,
+          authorizingOfficer: 'System',
+          referenceNumber: `REPAY-${r.id.substring(0, 8)}`,
+          description: `Principal: ${r.principal_portion || 0}, Interest: ${r.interest_portion || 0}`,
+          type: 'contribution'
+        });
+      });
+
+      // Process expenses
+      expenses?.forEach(e => {
+        allTransactions.push({
+          id: e.id,
+          timestamp: e.expense_date,
+          actionType: 'EXPENSE_PAID',
+          member: e.category,
+          amount: Number(e.amount),
+          paymentMethod: 'Cash',
+          previousBalance: 0,
+          newBalance: 0,
+          authorizingOfficer: 'System',
+          referenceNumber: `EXP-${e.id.substring(0, 8)}`,
+          description: e.description,
+          type: 'expense'
+        });
+      });
+
+      // Process fines
+      fines?.forEach(f => {
+        allTransactions.push({
+          id: f.id,
+          timestamp: f.fine_date,
+          actionType: 'FINE_IMPOSED',
+          member: f.users ? `${f.users.first_name} ${f.users.last_name} (${f.users.member_no})` : 'Unknown',
+          amount: Number(f.amount),
+          paymentMethod: 'System',
+          previousBalance: 0,
+          newBalance: 0,
+          authorizingOfficer: 'System',
+          referenceNumber: `FINE-${f.id.substring(0, 8)}`,
+          description: f.reason,
+          type: 'fine'
+        });
+      });
+
+      setTransactions(allTransactions);
     } catch (error) {
-      console.error('Error generating report:', error);
-      alert('Error generating report. Please try again.');
+      console.error('Error fetching financial transactions:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const recentReports = availableReports
-    .sort((a, b) => new Date(b.lastGenerated).getTime() - new Date(a.lastGenerated).getTime())
-    .slice(0, 3);
+  const applyFilters = () => {
+    let filtered = [...transactions];
+
+    // Search filter
+    if (searchTerm) {
+      filtered = filtered.filter(t => 
+        t.member.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.referenceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Type filter
+    if (selectedType !== 'all') {
+      filtered = filtered.filter(t => t.type === selectedType);
+    }
+
+    // Fund type filter
+    if (fundType !== 'all') {
+      filtered = filtered.filter(t => {
+        // Check contribution_type from the original data
+        return t.description?.toLowerCase().includes(fundType.toLowerCase());
+      });
+    }
+
+    // Money flow filter
+    if (moneyFlow !== 'all') {
+      if (moneyFlow === 'in') {
+        filtered = filtered.filter(t => ['contribution', 'income', 'fine'].includes(t.type));
+      } else if (moneyFlow === 'out') {
+        filtered = filtered.filter(t => ['expense', 'loan'].includes(t.type));
+      }
+    }
+
+    // Date range filter
+    if (dateFrom) {
+      filtered = filtered.filter(t => new Date(t.timestamp) >= new Date(dateFrom));
+    }
+    if (dateTo) {
+      filtered = filtered.filter(t => new Date(t.timestamp) <= new Date(dateTo));
+    }
+
+    // Amount range filter
+    if (minAmount) {
+      filtered = filtered.filter(t => t.amount >= Number(minAmount));
+    }
+    if (maxAmount) {
+      filtered = filtered.filter(t => t.amount <= Number(maxAmount));
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      let aValue, bValue;
+      switch (sortBy) {
+        case 'amount':
+          aValue = a.amount;
+          bValue = b.amount;
+          break;
+        case 'member':
+          aValue = a.member;
+          bValue = b.member;
+          break;
+        default:
+          aValue = new Date(a.timestamp);
+          bValue = new Date(b.timestamp);
+      }
+      
+      if (sortOrder === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+
+    setFilteredTransactions(filtered);
+  };
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setSelectedType('all');
+    setDateFrom('');
+    setDateTo('');
+    setMinAmount('');
+    setMaxAmount('');
+    setSelectedCategories([]);
+    setSortBy('date');
+    setSortOrder('desc');
+    setFundType('all');
+    setMoneyFlow('all');
+    setReportType('collective');
+    setSelectedMembers([]);
+  };
+
+  const applyQuickPreset = (days: number) => {
+    const today = new Date();
+    const fromDate = new Date(today.getTime() - (days * 24 * 60 * 60 * 1000));
+    setDateFrom(fromDate.toISOString().split('T')[0]);
+    setDateTo(today.toISOString().split('T')[0]);
+  };
+
+  const exportToCSV = () => {
+    const headers = ['Date', 'Type', 'Member', 'Amount', 'Payment Method', 'Reference', 'Description'];
+    const rows = filteredTransactions.map(t => [
+      new Date(t.timestamp).toLocaleDateString(),
+      t.actionType,
+      t.member,
+      t.amount.toLocaleString(),
+      t.paymentMethod,
+      t.referenceNumber,
+      t.description || ''
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `financial-report-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+  };
+
+  const exportToPDF = async () => {
+    const { generateFinancialSummaryPDF } = await import('@/utils/pdfGenerator');
+    generateFinancialSummaryPDF(filteredTransactions, 'Financial Report', 'financial-report');
+  };
+
+  const exportAdvancedPDF = async () => {
+    const { generateAdvancedFinancialReport } = await import('@/utils/advancedReportPDF');
+    
+    // Transform transactions to match the expected format
+    const transformedTransactions = filteredTransactions.map(t => ({
+      ...t,
+      memberId: t.id,
+      fundType: fundType !== 'all' ? fundType : undefined,
+      contributionType: fundType !== 'all' ? fundType : undefined
+    }));
+    
+    const filters = {
+      dateFrom,
+      dateTo,
+      transactionType: selectedType,
+      fundType,
+      minAmount: minAmount ? Number(minAmount) : undefined,
+      maxAmount: maxAmount ? Number(maxAmount) : undefined,
+      memberIds: selectedMembers,
+      reportType,
+      moneyFlow
+    };
+    
+    generateAdvancedFinancialReport(transformedTransactions, filters, 'Chama Management System');
+  };
+
+  // Prepare chart data
+  const chartData = React.useMemo(() => {
+    const monthlyData: { [key: string]: { month: string; contributions: number; loans: number; expenses: number; fines: number } } = {};
+    
+    filteredTransactions.forEach(t => {
+      const month = new Date(t.timestamp).toLocaleDateString('en', { month: 'short', year: '2-digit' });
+      if (!monthlyData[month]) {
+        monthlyData[month] = { month, contributions: 0, loans: 0, expenses: 0, fines: 0 };
+      }
+      
+      switch (t.type) {
+        case 'contribution':
+          monthlyData[month].contributions += t.amount;
+          break;
+        case 'loan':
+          monthlyData[month].loans += t.amount;
+          break;
+        case 'expense':
+          monthlyData[month].expenses += t.amount;
+          break;
+        case 'fine':
+          monthlyData[month].fines += t.amount;
+          break;
+      }
+    });
+    
+    return Object.values(monthlyData).sort((a, b) => a.month.localeCompare(b.month));
+  }, [filteredTransactions]);
 
   return (
     <div className="space-y-6">
@@ -219,77 +419,239 @@ export default function ReportsView() {
       >
         <div>
           <h1 className="text-3xl font-bold text-foreground">Reports & Analytics</h1>
-          <p className="text-muted-foreground mt-1">Generate comprehensive reports for Kamandoto SHG</p>
+          <p className="text-muted-foreground mt-1">Comprehensive financial reporting with advanced filtering</p>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="btn-primary flex items-center space-x-2"
-        >
-          <DocumentTextIcon className="h-5 w-5" />
-          <span>Custom Report</span>
-        </motion.button>
+        <div className="flex items-center space-x-3">
+          <Button
+            variant="outline"
+            onClick={() => setShowFilters(!showFilters)}
+            className="flex items-center space-x-2"
+          >
+            <FunnelIcon className="h-4 w-4" />
+            <span>Filters</span>
+          </Button>
+          <Button
+            variant="outline"
+            onClick={exportToCSV}
+            className="flex items-center space-x-2"
+          >
+            <ArrowDownTrayIcon className="h-4 w-4" />
+            <span>CSV</span>
+          </Button>
+          <Button
+            variant="outline"
+            onClick={exportToPDF}
+            className="flex items-center space-x-2"
+          >
+            <DocumentTextIcon className="h-4 w-4" />
+            <span>Basic PDF</span>
+          </Button>
+          <Button
+            onClick={exportAdvancedPDF}
+            className="flex items-center space-x-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+          >
+            <DocumentArrowDownIcon className="h-4 w-4" />
+            <span>Advanced PDF</span>
+          </Button>
+        </div>
       </motion.div>
 
-      {/* Live Financial Data */}
-      {summary && (
+      {/* Advanced Filters */}
+      {showFilters && (
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="card-elevated p-6"
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          exit={{ opacity: 0, height: 0 }}
+          className="card-elevated p-6 space-y-4"
         >
-          <h3 className="text-lg font-semibold text-foreground mb-4">Live Financial Summary</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Total Contributions</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold text-green-600">KES {summary.totalContributions.toLocaleString()}</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Active Loans</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold text-blue-600">KES {summary.totalLoans.toLocaleString()}</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Total Expenses</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold text-red-600">KES {summary.totalExpenses.toLocaleString()}</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Available Cash</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold text-primary">KES {summary.availableCash.toLocaleString()}</p>
-              </CardContent>
-            </Card>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Advanced Filters</h3>
+            <Button variant="ghost" size="sm" onClick={clearFilters}>
+              <XMarkIcon className="h-4 w-4 mr-2" />
+              Clear All
+            </Button>
           </div>
-          
-          <div className="flex justify-end space-x-2 mt-4">
-            <Button onClick={() => handleGenerateReport('financial-summary')} variant="outline">
-              Export Financial Summary (PDF)
-            </Button>
-            <Button onClick={() => handleGenerateReport('member-balances')}>
-              Export Member Balances (PDF)
-            </Button>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Search */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Search</label>
+              <div className="relative">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Member, reference, description..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            {/* Transaction Type */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Transaction Type</label>
+              <Select value={selectedType} onValueChange={setSelectedType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {transactionTypes.map(type => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Date Range */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Date From</label>
+              <Input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Date To</label>
+              <Input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Amount Range */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Min Amount (KES)</label>
+              <Input
+                type="number"
+                placeholder="0"
+                value={minAmount}
+                onChange={(e) => setMinAmount(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Max Amount (KES)</label>
+              <Input
+                type="number"
+                placeholder="No limit"
+                value={maxAmount}
+                onChange={(e) => setMaxAmount(e.target.value)}
+              />
+            </div>
+
+            {/* Fund Type Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Fund Type</label>
+              <Select value={fundType} onValueChange={setFundType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {fundTypes.map(type => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Money Flow Filter */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Money Flow</label>
+              <Select value={moneyFlow} onValueChange={(value: 'in' | 'out' | 'all') => setMoneyFlow(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {moneyFlowOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Sort Options */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Sort By</label>
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="date">Date</SelectItem>
+                  <SelectItem value="amount">Amount</SelectItem>
+                  <SelectItem value="member">Member</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Order</label>
+              <Select value={sortOrder} onValueChange={(value: 'asc' | 'desc') => setSortOrder(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="desc">Descending</SelectItem>
+                  <SelectItem value="asc">Ascending</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Report Type Selection */}
+            <div className="space-y-2 col-span-2">
+              <label className="text-sm font-medium">Report Type (for PDF)</label>
+              <div className="flex gap-4 items-center h-10">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <Checkbox 
+                    checked={reportType === 'collective'}
+                    onCheckedChange={() => setReportType('collective')}
+                  />
+                  <span className="text-sm">Collective (All Members)</span>
+                </label>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <Checkbox 
+                    checked={reportType === 'individual'}
+                    onCheckedChange={() => setReportType('individual')}
+                  />
+                  <span className="text-sm">Individual Member</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Presets */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Quick Presets</label>
+            <div className="flex flex-wrap gap-2">
+              {quickPresets.map(preset => (
+                <Button
+                  key={preset.label}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => applyQuickPreset(preset.days)}
+                >
+                  {preset.label}
+                </Button>
+              ))}
+            </div>
           </div>
         </motion.div>
       )}
 
-      {/* Quick Stats */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -299,11 +661,11 @@ export default function ReportsView() {
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Available Reports</p>
-              <p className="text-2xl font-bold text-foreground mt-2">{availableReports.length}</p>
+              <p className="text-sm font-medium text-muted-foreground">Total Transactions</p>
+              <p className="text-2xl font-bold text-foreground mt-2">{filteredTransactions.length}</p>
             </div>
             <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center">
-              <DocumentTextIcon className="h-6 w-6 text-primary" />
+              <ChartBarIcon className="h-6 w-6 text-primary" />
             </div>
           </div>
         </motion.div>
@@ -316,12 +678,13 @@ export default function ReportsView() {
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">This Month</p>
-              <p className="text-2xl font-bold text-foreground mt-2">12</p>
-              <p className="text-sm text-success mt-1">Reports generated</p>
+              <p className="text-sm font-medium text-muted-foreground">Total Income</p>
+              <p className="text-2xl font-bold text-green-600 mt-2">
+                KES {filteredTransactions.filter(t => t.type === 'contribution').reduce((sum, t) => sum + t.amount, 0).toLocaleString()}
+              </p>
             </div>
-            <div className="h-12 w-12 bg-success/10 rounded-lg flex items-center justify-center">
-              <CalendarDaysIcon className="h-6 w-6 text-success" />
+            <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <ArrowDownTrayIcon className="h-6 w-6 text-green-600" />
             </div>
           </div>
         </motion.div>
@@ -334,12 +697,13 @@ export default function ReportsView() {
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Automated</p>
-              <p className="text-2xl font-bold text-foreground mt-2">4</p>
-              <p className="text-sm text-accent mt-1">Scheduled reports</p>
+              <p className="text-sm font-medium text-muted-foreground">Total Expenses</p>
+              <p className="text-2xl font-bold text-red-600 mt-2">
+                KES {filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0).toLocaleString()}
+              </p>
             </div>
-            <div className="h-12 w-12 bg-accent/10 rounded-lg flex items-center justify-center">
-              <ChartBarIcon className="h-6 w-6 text-accent" />
+            <div className="h-12 w-12 bg-red-100 rounded-lg flex items-center justify-center">
+              <ArrowDownTrayIcon className="h-6 w-6 text-red-600" />
             </div>
           </div>
         </motion.div>
@@ -352,160 +716,207 @@ export default function ReportsView() {
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Downloads</p>
-              <p className="text-2xl font-bold text-foreground mt-2">47</p>
-              <p className="text-sm text-muted-foreground mt-1">This month</p>
+              <p className="text-sm font-medium text-muted-foreground">Net Position</p>
+              <p className="text-2xl font-bold text-blue-600 mt-2">
+                KES {(filteredTransactions.filter(t => t.type === 'contribution').reduce((sum, t) => sum + t.amount, 0) - 
+                     filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)).toLocaleString()}
+              </p>
             </div>
-            <div className="h-12 w-12 bg-warning/10 rounded-lg flex items-center justify-center">
-              <ArrowDownTrayIcon className="h-6 w-6 text-warning" />
+            <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <ChartBarIcon className="h-6 w-6 text-blue-600" />
             </div>
           </div>
         </motion.div>
       </div>
 
-      {/* Recent Reports */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-        className="card-elevated p-6"
-      >
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold text-foreground">Recently Generated</h3>
-          <button className="text-primary hover:text-primary-hover text-sm font-medium">
-            View All
-          </button>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {recentReports.map((report, index) => (
-            <motion.div
-              key={report.id}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.6 + index * 0.1 }}
-              className="p-4 bg-muted/30 rounded-lg border hover:shadow-md transition-all duration-200"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <h4 className="font-medium text-foreground">{report.name}</h4>
-                  <p className="text-sm text-muted-foreground mt-1">{report.category}</p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Generated: {new Date(report.lastGenerated).toLocaleDateString()}
+      {/* Main Content Tabs */}
+      <Tabs defaultValue="table" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="table">Tabulated Data</TabsTrigger>
+          <TabsTrigger value="charts">Interactive Charts</TabsTrigger>
+          <TabsTrigger value="summary">Summary Report</TabsTrigger>
+        </TabsList>
+
+        {/* Tabulated Data View */}
+        <TabsContent value="table" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Financial Transactions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-muted/30">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Type</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Member</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Amount</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Method</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Reference</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Description</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredTransactions.map((transaction) => (
+                      <tr key={transaction.id} className="hover:bg-muted/20">
+                        <td className="px-4 py-3 text-sm text-foreground">
+                          {new Date(transaction.timestamp).toLocaleDateString()}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <Badge variant={
+                            transaction.type === 'contribution' ? 'default' :
+                            transaction.type === 'expense' ? 'destructive' :
+                            transaction.type === 'loan' ? 'secondary' : 'outline'
+                          }>
+                            {transaction.actionType.replace(/_/g, ' ')}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-foreground">{transaction.member}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-foreground">
+                          KES {transaction.amount.toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{transaction.paymentMethod}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground font-mono">{transaction.referenceNumber}</td>
+                        <td className="px-4 py-3 text-sm text-muted-foreground">{transaction.description || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Interactive Charts */}
+        <TabsContent value="charts" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Monthly Transaction Trends</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip />
+                      <Line type="monotone" dataKey="contributions" stroke="#22C55E" strokeWidth={2} />
+                      <Line type="monotone" dataKey="loans" stroke="#3B82F6" strokeWidth={2} />
+                      <Line type="monotone" dataKey="expenses" stroke="#EF4444" strokeWidth={2} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Transaction Types Distribution</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="contributions" fill="#22C55E" />
+                      <Bar dataKey="loans" fill="#3B82F6" />
+                      <Bar dataKey="expenses" fill="#EF4444" />
+                      <Bar dataKey="fines" fill="#F59E0B" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Summary Report */}
+        <TabsContent value="summary" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Transaction Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between">
+                  <span>Total Contributions:</span>
+                  <span className="font-medium text-green-600">
+                    KES {filteredTransactions.filter(t => t.type === 'contribution').reduce((sum, t) => sum + t.amount, 0).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Total Loans:</span>
+                  <span className="font-medium text-blue-600">
+                    KES {filteredTransactions.filter(t => t.type === 'loan').reduce((sum, t) => sum + t.amount, 0).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Total Expenses:</span>
+                  <span className="font-medium text-red-600">
+                    KES {filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Total Fines:</span>
+                  <span className="font-medium text-yellow-600">
+                    KES {filteredTransactions.filter(t => t.type === 'fine').reduce((sum, t) => sum + t.amount, 0).toLocaleString()}
+                  </span>
+                </div>
+                <hr />
+                <div className="flex justify-between font-bold">
+                  <span>Net Position:</span>
+                  <span className={
+                    (filteredTransactions.filter(t => t.type === 'contribution').reduce((sum, t) => sum + t.amount, 0) - 
+                     filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)) >= 0 
+                      ? 'text-green-600' : 'text-red-600'
+                  }>
+                    KES {(filteredTransactions.filter(t => t.type === 'contribution').reduce((sum, t) => sum + t.amount, 0) - 
+                         filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)).toLocaleString()}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Export Options</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Button onClick={exportToCSV} className="w-full" variant="outline">
+                  <ArrowDownTrayIcon className="h-4 w-4 mr-2" />
+                  Download CSV
+                </Button>
+                <Button onClick={exportToPDF} className="w-full" variant="outline">
+                  <DocumentTextIcon className="h-4 w-4 mr-2" />
+                  Basic PDF Report
+                </Button>
+                <Button 
+                  onClick={exportAdvancedPDF} 
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                >
+                  <DocumentArrowDownIcon className="h-4 w-4 mr-2" />
+                  Advanced PDF Report
+                </Button>
+                <Button onClick={() => window.print()} className="w-full" variant="outline">
+                  <PrinterIcon className="h-4 w-4 mr-2" />
+                  Print Report
+                </Button>
+                <div className="pt-4 border-t">
+                  <p className="text-xs text-muted-foreground">
+                    <strong>Advanced PDF</strong> includes fund breakdowns, money in/out analysis, and member-specific reports based on your filters.
                   </p>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <button className="p-1 hover:bg-secondary rounded transition-colors">
-                    <EyeIcon className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                  <button className="p-1 hover:bg-secondary rounded transition-colors">
-                    <ArrowDownTrayIcon className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-      </motion.div>
-
-      {/* Category Filters & Month Selection */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.7 }}
-        className="space-y-4"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <span className="text-sm font-medium text-foreground">Filter by category:</span>
-            {reportCategories.map((category) => (
-              <button
-                key={category}
-                onClick={() => setSelectedCategory(category)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  selectedCategory === category
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-secondary text-secondary-foreground hover:bg-muted'
-                }`}
-              >
-                {category}
-              </button>
-            ))}
+              </CardContent>
+            </Card>
           </div>
-          
-          <div className="flex items-center space-x-2">
-            <CalendarDaysIcon className="h-5 w-5 text-muted-foreground" />
-            <input
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              max={new Date().toISOString().slice(0, 7)}
-              className="px-3 py-2 border border-input-border rounded-lg bg-input text-sm focus:outline-none focus:ring-2 focus:ring-accent-border"
-            />
-            <span className="text-sm text-muted-foreground">Report Period</span>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Reports Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredReports.map((report, index) => (
-          <motion.div
-            key={report.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8 + index * 0.1 }}
-            className="card-elevated p-6 hover:shadow-lg transition-all duration-200"
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="h-10 w-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                  <report.icon className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-foreground">{report.name}</h3>
-                  <p className="text-sm text-muted-foreground mt-1">{report.description}</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="mt-4 flex items-center justify-between text-sm">
-              <div>
-                <span className="text-muted-foreground">Frequency: </span>
-                <span className="text-foreground font-medium">{report.frequency}</span>
-              </div>
-              <div className="text-right">
-                <span className="text-muted-foreground">Format: </span>
-                <span className="text-foreground font-medium">{report.format}</span>
-              </div>
-            </div>
-            
-            <div className="mt-4 text-xs text-muted-foreground">
-              Last generated: {new Date(report.lastGenerated).toLocaleDateString()}
-            </div>
-            
-            <div className="mt-4 flex items-center space-x-2">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="btn-primary flex-1 text-sm"
-                onClick={() => handleGenerateReport(report.id)}
-              >
-                Generate
-              </motion.button>
-              <button className="p-2 hover:bg-secondary rounded-lg transition-colors">
-                <EyeIcon className="h-4 w-4 text-muted-foreground" />
-              </button>
-              <button 
-                className="p-2 hover:bg-secondary rounded-lg transition-colors"
-                onClick={() => handleGenerateReport('print-report')}
-                title="Print Report"
-              >
-                <PrinterIcon className="h-4 w-4 text-muted-foreground" />
-              </button>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
