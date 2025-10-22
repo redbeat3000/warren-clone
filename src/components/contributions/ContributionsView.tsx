@@ -7,80 +7,46 @@ import {
   DocumentArrowDownIcon,
   EyeIcon,
   PrinterIcon,
-  PencilIcon
+  PencilIcon,
 } from '@heroicons/react/24/outline';
-import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import AddContributionForm from './AddContributionForm';
+import { Badge } from '@/components/ui/badge';
 import { EditContributionDialog } from '@/components/members/EditContributionDialog';
 import { supabase } from '@/integrations/supabase/client';
-
-// Sample contributions data
-const sampleContributions = [
-  {
-    id: '1',
-    receiptNo: 'REC001',
-    memberName: 'Alice Wanjiku',
-    memberNo: 'CH001',
-    amount: 5000,
-    date: '2024-01-15',
-    paymentMethod: 'M-Pesa',
-    status: 'confirmed'
-  },
-  {
-    id: '2',
-    receiptNo: 'REC002',
-    memberName: 'John Kamau',
-    memberNo: 'CH002',
-    amount: 5000,
-    date: '2024-01-15',
-    paymentMethod: 'Bank Transfer',
-    status: 'confirmed'
-  },
-  {
-    id: '3',
-    receiptNo: 'REC003',
-    memberName: 'Mary Njoki',
-    memberNo: 'CH003',
-    amount: 5000,
-    date: '2024-01-14',
-    paymentMethod: 'Cash',
-    status: 'pending'
-  },
-  {
-    id: '4',
-    receiptNo: 'REC004',
-    memberName: 'Peter Mwangi',
-    memberNo: 'CH004',
-    amount: 7500,
-    date: '2024-01-13',
-    paymentMethod: 'M-Pesa',
-    status: 'confirmed'
-  }
-];
 
 export default function ContributionsView() {
   const [filter, setFilter] = useState('all');
   const [isAddContributionOpen, setIsAddContributionOpen] = useState(false);
   const [editingContribution, setEditingContribution] = useState<any>(null);
+  const [viewingBreakdown, setViewingBreakdown] = useState<any | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [contributions, setContributions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchContributions();
-    
     // Set up real-time subscription
     const channel = supabase
       .channel('contributions-changes')
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'contributions'
         },
         () => {
-          fetchContributions();
+          // Add a small delay to allow the database to settle before refetching
+          // This also helps prevent multiple rapid refetches
+          setTimeout(() => fetchContributions(), 500);
         }
       )
       .subscribe();
@@ -88,31 +54,32 @@ export default function ContributionsView() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [refreshKey]); // Removed fetchContributions from dependencies
 
   const fetchContributions = async () => {
     try {
       const { data, error } = await supabase
-        .from('contributions')
-        .select('*, users!inner(first_name, last_name, member_no)')
-        .order('contribution_date', { ascending: false });
+        .from('transaction_summary') // Use the new summary view
+        .select('*')
+        .in('category', [ // Filter for only contribution-related transactions
+          'Regular Contributions',
+          'Land Fund',
+          'Security Fund',
+          'Tea Fund',
+          'Xmas Savings',
+          'Registration Fees'
+        ])
+        .order('date', { ascending: false });
 
       if (error) throw error;
 
-      const formattedContributions = (data || []).map((contrib: any) => ({
-        ...contrib,
-        id: contrib.id,
-        receiptNo: contrib.receipt_no || `REC${contrib.id.slice(-3)}`,
-        memberName: `${contrib.users.first_name} ${contrib.users.last_name}`,
-        memberNo: contrib.users.member_no || 'N/A',
-        amount: contrib.amount,
-        contributionType: contrib.contribution_type || 'savings',
-        date: contrib.contribution_date,
-        paymentMethod: contrib.payment_method || 'N/A',
-        status: 'confirmed'
+      // The view already provides grouped data, so we can use it directly.
+      const formattedData = (data || []).map(item => ({
+        ...item,
+        receiptNo: item.receipt_no || `TXN-${item.transaction_id?.slice(-4) ?? 'N/A'}`,
       }));
 
-      setContributions(formattedContributions);
+      setContributions(formattedData);
     } catch (error) {
       console.error('Error fetching contributions:', error);
     } finally {
@@ -120,18 +87,23 @@ export default function ContributionsView() {
     }
   };
 
-  const activeContributions = contributions.length > 0 ? contributions : sampleContributions;
-  const totalContributions = activeContributions.reduce((sum, contrib) => sum + contrib.amount, 0);
+  // Calculate "This Month" contributions
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const thisMonthContributions = contributions.filter(c => new Date(c.date) >= startOfMonth);
+  const totalThisMonth = thisMonthContributions.reduce((sum, contrib) => sum + contrib.amount, 0);
+
+  // Grand total for average calculation
+  const totalAllTime = contributions.reduce((sum, contrib: any) => sum + contrib.amount, 0);
+
   const monthlyTarget = 50000;
-  const targetProgress = (totalContributions / monthlyTarget) * 100;
+  const targetProgress = (totalThisMonth / monthlyTarget) * 100;
   
   // Count unique members who contributed
-  const uniqueMembers = new Set(activeContributions.map(c => c.memberNo));
+  const uniqueMembers = new Set(contributions.map((c: any) => c.memberNo));
   const contributorCount = uniqueMembers.size;
 
-  const filteredContributions = activeContributions.filter(contrib => 
-    filter === 'all' || contrib.status === filter
-  );
+  const filteredContributions = contributions.filter((contrib: any) => filter === 'all' || contrib.status === filter);
 
   const handlePrintContributions = async () => {
     const { printContributionsPDF } = await import('@/utils/pdfGenerator');
@@ -141,6 +113,31 @@ export default function ContributionsView() {
   const handleExportContributions = async () => {
     const { generateContributionsPDF } = await import('@/utils/pdfGenerator');
     generateContributionsPDF(filteredContributions);
+  };
+
+  const handleViewBreakdown = async (transaction: any) => {
+    setViewingBreakdown(null); // Clear previous breakdown
+    // Fetch all parts of the transaction
+    const [
+      { data: contributionsData },
+      { data: finePaymentsData },
+      { data: loanRepaymentsData }
+    ] = await Promise.all([
+      supabase.from('contributions').select('*').eq('transaction_id', transaction.transaction_id),
+      supabase.from('fine_payments').select('*, fines(reason)').eq('transaction_id', transaction.transaction_id),
+      supabase.from('loan_repayments').select('*').eq('transaction_id', transaction.transaction_id)
+    ]);
+
+    const breakdown: any[] = [];
+
+    (contributionsData || []).forEach(c => breakdown.push({ type: c.contribution_type.replace(/_/g, ' '), amount: c.amount }));
+    (finePaymentsData || []).forEach(fp => breakdown.push({ type: `Fine: ${fp.fines?.reason || 'payment'}`, amount: fp.amount }));
+    (loanRepaymentsData || []).forEach(lr => breakdown.push({ type: `Loan Repayment #${lr.loan_id.slice(-4)}`, amount: lr.amount }));
+
+    setViewingBreakdown({
+      ...transaction,
+      breakdown: breakdown,
+    });
   };
 
   return (
@@ -197,7 +194,7 @@ export default function ContributionsView() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">This Month</p>
-              <p className="text-2xl font-bold text-foreground mt-2">KES {totalContributions.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-foreground mt-2">KES {totalThisMonth.toLocaleString()}</p>
               <div className="flex items-center mt-3">
                 <div className="w-full bg-muted rounded-full h-2 mr-3">
                   <div 
@@ -223,8 +220,8 @@ export default function ContributionsView() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Contributors</p>
-              <p className="text-2xl font-bold text-foreground mt-2">{contributorCount}</p>
-              <p className="text-sm text-success mt-2">{activeContributions.length} total contributions</p>
+              <p className="text-2xl font-bold text-foreground mt-2">{loading ? '...' : contributorCount}</p>
+              <p className="text-sm text-success mt-2">{loading ? '...' : `${contributions.length} total transactions`}</p>
             </div>
             <div className="h-12 w-12 bg-success/10 rounded-lg flex items-center justify-center">
               <CalendarDaysIcon className="h-6 w-6 text-success" />
@@ -242,7 +239,7 @@ export default function ContributionsView() {
             <div>
               <p className="text-sm font-medium text-muted-foreground">Average</p>
               <p className="text-2xl font-bold text-foreground mt-2">
-                KES {activeContributions.length > 0 ? Math.round(totalContributions / activeContributions.length).toLocaleString() : '0'}
+                KES {contributions.length > 0 ? Math.round(totalAllTime / contributions.length).toLocaleString() : '0'}
               </p>
               <p className="text-sm text-muted-foreground mt-2">Per contribution</p>
             </div>
@@ -294,9 +291,6 @@ export default function ContributionsView() {
                   Member
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Type
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Amount
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -316,7 +310,7 @@ export default function ContributionsView() {
             <tbody className="divide-y divide-border">
               {filteredContributions.map((contribution, index) => (
                 <motion.tr
-                  key={contribution.id}
+                  key={contribution.transaction_id}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.6 + index * 0.1 }}
@@ -327,22 +321,9 @@ export default function ContributionsView() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div>
-                      <div className="text-sm font-medium text-foreground">{contribution.memberName}</div>
-                      <div className="text-sm text-muted-foreground">{contribution.memberNo}</div>
+                      <div className="text-sm font-medium text-foreground">{contribution.member_name}</div>
+                      <div className="text-sm text-muted-foreground">{contribution.member_no}</div>
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                      contribution.contributionType === 'savings' ? 'bg-primary/10 text-primary' :
-                      contribution.contributionType === 'land_fund' ? 'bg-success/10 text-success' :
-                      contribution.contributionType === 'security' ? 'bg-warning/10 text-warning' :
-                      contribution.contributionType === 'tea' ? 'bg-accent/10 text-accent' :
-                      'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-                    }`}>
-                      {contribution.contributionType === 'land_fund' ? 'Land Fund' :
-                       contribution.contributionType === 'xmas' ? 'Christmas' :
-                       contribution.contributionType?.charAt(0).toUpperCase() + contribution.contributionType?.slice(1)}
-                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-foreground">KES {contribution.amount.toLocaleString()}</div>
@@ -351,7 +332,7 @@ export default function ContributionsView() {
                     <div className="text-sm text-foreground">{new Date(contribution.date).toLocaleDateString()}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-foreground">{contribution.paymentMethod}</div>
+                    <div className="text-sm text-foreground">{contribution.payment_method}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
@@ -364,22 +345,12 @@ export default function ContributionsView() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center space-x-2">
-                      <button className="p-1 hover:bg-secondary rounded transition-colors">
+                      <button
+                        className="p-1 hover:bg-secondary rounded transition-colors"
+                        onClick={() => handleViewBreakdown(contribution)}
+                        title="View Breakdown"
+                      >
                         <EyeIcon className="h-4 w-4 text-muted-foreground" />
-                      </button>
-                      <button 
-                        className="p-1 hover:bg-secondary rounded transition-colors"
-                        onClick={() => setEditingContribution(contribution)}
-                        title="Edit Contribution"
-                      >
-                        <PencilIcon className="h-4 w-4 text-muted-foreground" />
-                      </button>
-                      <button 
-                        className="p-1 hover:bg-secondary rounded transition-colors"
-                        onClick={handlePrintContributions}
-                        title="Print Contributions"
-                      >
-                        <PrinterIcon className="h-4 w-4 text-muted-foreground" />
                       </button>
                     </div>
                   </td>
@@ -400,6 +371,33 @@ export default function ContributionsView() {
             fetchContributions();
           }}
         />
+      )}
+
+      {viewingBreakdown && (
+        <Dialog open={!!viewingBreakdown} onOpenChange={(open) => !open && setViewingBreakdown(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Contribution Breakdown</DialogTitle>
+              <DialogDescription> 
+                Details for receipt #{viewingBreakdown.receiptNo} from {viewingBreakdown.member_name}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="mt-4">
+              <ul className="space-y-2">
+                {viewingBreakdown.breakdown?.map((item: any, index: number) => (
+                  <li key={index} className="flex justify-between items-center p-2 bg-muted/50 rounded-md">
+                    <Badge variant="secondary" className="capitalize whitespace-normal text-left">
+                      {item.type.replace(/_/g, ' ')}
+                    </Badge>
+                    <span className="font-medium text-foreground">
+                      KES {item.amount.toLocaleString()}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

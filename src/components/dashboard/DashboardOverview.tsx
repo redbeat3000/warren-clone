@@ -64,12 +64,17 @@ export default function DashboardOverview() {
     []
   );
   const { data: loans } = useSupabaseQuery('loans', 'status, issue_date, principal', []);
-  const { data: loanInterest } = useSupabaseQuery('loan_repayments', 'interest_portion', []);
-  const { data: fines } = useSupabaseQuery('fines', 'paid_amount', []);
-  const { data: allContributions } = useSupabaseQuery('contributions', 'amount, contribution_type', []);
+  const { data: incomeRecords } = useSupabaseQuery(
+    'income_records',
+    'amount, status',
+    [],
+    // Filter for only profit-generating categories at the database level
+    (query) => query.filter('income_categories.name', 'in', '("loan_interest","fines_penalties","registration_fees")')
+  );
+  const { data: expenses } = useSupabaseQuery('expenses', 'amount', []);
   const { data: recentActivity } = useSupabaseQuery(
     'contributions', 
-    '*, users!inner(first_name, last_name)', 
+    '*, users!inner(first_name, last_name), total_transaction_amount', 
     []
   );
 
@@ -83,14 +88,17 @@ export default function DashboardOverview() {
     { amount: 5300, contribution_date: '2024-06-15' }
   ];
 
-  // Calculate Available Cash: Loan Interest + Registration Fees + Fines (not principal or expenses)
+  // Calculate Available Cash: Total Income from income_records minus Total Expenses
   const availableCashCalculated = React.useMemo(() => {
-    const totalLoanInterest = (loanInterest || []).reduce((sum, r: any) => sum + parseFloat(r.interest_portion || 0), 0);
-    const totalFines = (fines || []).reduce((sum, f: any) => sum + parseFloat(f.paid_amount || 0), 0);
-    const registrationFees = (allContributions || []).filter((c: any) => c.contribution_type === 'registration_fee');
-    const totalRegFees = registrationFees.reduce((sum, c: any) => sum + parseFloat(c.amount || 0), 0);
-    return totalLoanInterest + totalFines + totalRegFees;
-  }, [loanInterest, fines, allContributions]);
+    const totalIncome = (incomeRecords || [])
+      .filter((r: any) => 
+        r.status === 'verified'
+      )
+      .reduce((sum, r: any) => sum + parseFloat(r.amount || 0), 0);
+
+    const totalExpenses = (expenses || []).reduce((sum, e: any) => sum + parseFloat(e.amount || 0), 0);
+    return totalIncome - totalExpenses;
+  }, [incomeRecords, expenses]);
 
   const sampleLoans = [
     { status: 'active', issue_date: '2023-11-01', principal: 50000 },
@@ -122,6 +130,25 @@ export default function DashboardOverview() {
   const activeLoans = loans.length > 0 ? loans : sampleLoans;
   const activeActivity = recentActivity.length > 0 ? recentActivity : sampleActivity;
 
+  // Group activities by receipt number and date to show a single total transaction amount
+  const groupedActivity = React.useMemo(() => {
+    if (!activeActivity.length) return [];
+
+    const grouped = activeActivity.reduce((acc: any, activity: any) => {
+      const key = `${activity.receipt_no || `no-receipt-${activity.id}`}-${activity.contribution_date}`;
+      if (!acc[key]) {
+        acc[key] = {
+          ...activity,
+          // Use total_transaction_amount if available, otherwise sum up amounts with the same key
+          amount: activity.total_transaction_amount || parseFloat(activity.amount || 0),
+          isGrouped: false,
+        };
+      }
+      return acc;
+    }, {});
+
+    return Object.values(grouped);
+  }, [activeActivity]);
   // Process monthly contributions
   const monthlyContributions = React.useMemo(() => {
     if (!activeContributions.length) return [];
@@ -157,7 +184,7 @@ export default function DashboardOverview() {
     
     return [
       { name: 'Active', value: statusCounts.active || 0, color: '#22C55E' },
-      { name: 'Overdue', value: statusCounts.overdue || 0, color: '#EF4444' },
+      { name: 'Repaid', value: statusCounts.repaid || 0, color: '#EF4444' },
       { name: 'Pending', value: statusCounts.pending || 0, color: '#F59E0B' },
     ];
   }, [activeLoans]);
@@ -281,30 +308,42 @@ export default function DashboardOverview() {
           transition={{ delay: 0.6 }}
           className="card-elevated p-6"
         >
-          <h3 className="text-lg font-semibold text-foreground mb-6">Loans Issued Over Time</h3>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-foreground">Loans Issued Over Time</h3>
+            <div className="flex items-center space-x-2">
+              <div className="h-3 w-3 bg-orange-500 rounded-full"></div>
+              <span className="text-sm text-muted-foreground">Loans</span>
+            </div>
+          </div>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={loansOverTime}>
+              <AreaChart data={loansOverTime}>
+                <defs>
+                  <linearGradient id="colorLoans" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#F97316" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#F97316" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                 <XAxis dataKey="month" stroke="#6B7280" />
                 <YAxis stroke="#6B7280" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'white', 
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'white',
                     border: '1px solid #E5E7EB',
                     borderRadius: '8px',
                     boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
                   }}
                 />
-                <Line 
-                  type="monotone" 
-                  dataKey="count" 
-                  stroke="#3B82F6" 
-                  strokeWidth={3}
-                  dot={{ fill: '#3B82F6', r: 4 }}
-                  activeDot={{ r: 6 }}
+                <Area
+                  type="monotone"
+                  dataKey="count"
+                  stroke="#F97316"
+                  strokeWidth={2}
+                  fillOpacity={1}
+                  fill="url(#colorLoans)"
                 />
-              </LineChart>
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </motion.div>
@@ -330,7 +369,7 @@ export default function DashboardOverview() {
                 <DialogTitle>All Recent Activity</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 mt-4">
-                {activeActivity.map((activity: any, index: number) => (
+                {groupedActivity.map((activity: any, index: number) => (
                   <motion.div
                     key={index}
                     initial={{ opacity: 0, x: -20 }}
@@ -360,7 +399,7 @@ export default function DashboardOverview() {
           </Dialog>
         </div>
         <div className="space-y-4">
-          {activeActivity.slice(0, 3).map((activity: any, index: number) => (
+          {groupedActivity.slice(0, 3).map((activity: any, index: number) => (
             <motion.div
               key={index}
               initial={{ opacity: 0, x: -20 }}

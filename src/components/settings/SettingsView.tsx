@@ -13,7 +13,7 @@ import {
 import { useSettings, MemberManagementSettings } from '@/hooks/useSettings';
 
 export default function SettingsView() {
-  const [activeTab, setActiveTab] = useState('general');
+  const [activeTab, setActiveTab] = useState('security');
   const { settings, loading, saveSettings } = useSettings();
   const [localSettings, setLocalSettings] = useState<MemberManagementSettings>(settings);
 
@@ -23,10 +23,6 @@ export default function SettingsView() {
   }, [settings]);
 
   const settingsTabs = [
-    { id: 'general', name: 'General', icon: Cog6ToothIcon },
-    { id: 'financial', name: 'Financial', icon: CurrencyDollarIcon },
-    { id: 'members', name: 'Members', icon: UsersIcon },
-    { id: 'notifications', name: 'Notifications', icon: BellIcon },
     { id: 'security', name: 'Security', icon: ShieldCheckIcon }
   ];
 

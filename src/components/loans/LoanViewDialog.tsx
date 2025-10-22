@@ -12,9 +12,11 @@ interface LoanViewDialogProps {
 export default function LoanViewDialog({ loan, open, onClose }: LoanViewDialogProps) {
   if (!loan) return null;
 
-  const totalPaid = loan.outstandingBalance ? loan.principal - loan.balance : 0;
-  const interestPaid = totalPaid > 0 ? (totalPaid * loan.interestRate / 100) : 0;
-  const principalPaid = totalPaid - interestPaid;
+  const totalLoanAmount = loan.principal + (loan.total_interest_calculated || 0);
+  const totalPaid = totalLoanAmount - loan.outstandingBalance;
+  // Note: This is a simplified breakdown. For exact principal/interest paid, we'd need to sum loan_repayments portions.
+  const principalPaid = Math.min(totalPaid, loan.principal);
+  const interestPaid = totalPaid - principalPaid;
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -33,7 +35,7 @@ export default function LoanViewDialog({ loan, open, onClose }: LoanViewDialogPr
             </div>
             <div className="card-elevated p-4">
               <p className="text-sm text-muted-foreground">Status</p>
-              <Badge className={loan.status === 'active' ? 'status-active' : loan.status === 'overdue' ? 'status-overdue' : 'status-inactive'}>
+              <Badge className={loan.status === 'repaid' ? 'status-active' : 'status-pending'}>
                 {loan.status}
               </Badge>
             </div>
@@ -62,14 +64,6 @@ export default function LoanViewDialog({ loan, open, onClose }: LoanViewDialogPr
                 <p className="text-sm text-muted-foreground">Issue Date</p>
                 <p className="text-base font-medium text-foreground">{format(new Date(loan.issueDate), 'PPP')}</p>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Due Date</p>
-                <p className="text-base font-medium text-foreground">{format(new Date(loan.nextPayment), 'PPP')}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Monthly Payment</p>
-                <p className="text-base font-medium text-foreground">KES {loan.monthlyPayment.toLocaleString()}</p>
-              </div>
             </div>
           </div>
 
@@ -83,11 +77,11 @@ export default function LoanViewDialog({ loan, open, onClose }: LoanViewDialogPr
               </div>
               <div className="flex justify-between py-2 border-b border-border">
                 <span className="text-foreground">Total Interest</span>
-                <span className="font-semibold text-foreground">KES {((loan.monthlyPayment * loan.term) - loan.principal).toLocaleString()}</span>
+                <span className="font-semibold text-foreground">KES {(loan.total_interest_calculated || 0).toLocaleString()}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-border">
                 <span className="text-foreground">Total Loan Amount</span>
-                <span className="font-semibold text-primary">KES {(loan.monthlyPayment * loan.term).toLocaleString()}</span>
+                <span className="font-semibold text-primary">KES {totalLoanAmount.toLocaleString()}</span>
               </div>
               <div className="flex justify-between py-2 border-b border-border">
                 <span className="text-success">Amount Paid</span>
@@ -95,7 +89,7 @@ export default function LoanViewDialog({ loan, open, onClose }: LoanViewDialogPr
               </div>
               <div className="flex justify-between py-2 border-b border-border">
                 <span className="text-warning">Remaining Balance</span>
-                <span className="font-semibold text-warning">KES {loan.balance.toLocaleString()}</span>
+                <span className="font-semibold text-warning">KES {loan.outstandingBalance.toLocaleString()}</span>
               </div>
             </div>
           </div>

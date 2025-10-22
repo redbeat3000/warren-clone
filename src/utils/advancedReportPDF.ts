@@ -476,7 +476,8 @@ export class AdvancedReportPDFGenerator {
       this.addMoneyInOutAnalysis(transactions);
     }
     
-    // Add individual member analysis for collective reports
+    // Add individual member analysis for collective reports only
+    // For individual reports, skip this section as it would only show one member
     if (filters.reportType === 'collective' && transactions.length > 0) {
       this.addIndividualMemberAnalysis(transactions);
     }

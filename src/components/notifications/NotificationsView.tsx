@@ -30,34 +30,24 @@ const sampleNotifications: Notification[] = [
   {
     id: '1',
     type: 'reminder',
-    title: 'Monthly Contribution Due',
-    message: 'Your monthly contribution of KES 5,000 is due in 3 days',
-    channel: 'sms',
-    recipient: 'All Members',
+    title: 'Monthly Report Generation Reminder',
+    message: 'End of month approaching in 3 days. Please generate monthly reports.',
+    channel: 'email',
+    recipient: 'Administrators',
     status: 'sent',
-    created_at: '2024-02-01',
-    scheduled_for: '2024-02-04'
+    created_at: '2024-02-27',
+    scheduled_for: '2024-02-28'
   },
   {
     id: '2',
-    type: 'alert',
-    title: 'Loan Payment Overdue',
-    message: 'Loan payment for MaryJackline Aluoch is 5 days overdue',
-    channel: 'email',
-    recipient: 'MaryJackline Aluoch',
-    status: 'sent',
-    created_at: '2024-01-30'
-  },
-  {
-    id: '3',
-    type: 'info',
-    title: 'Meeting Reminder',
-    message: 'Monthly meeting scheduled for tomorrow at 2 PM',
+    type: 'reminder',
+    title: 'Monthly Report Generation Reminder',
+    message: 'End of month approaching in 2 days. Please generate monthly reports.',
     channel: 'push',
-    recipient: 'All Members',
+    recipient: 'Administrators',
     status: 'pending',
-    created_at: '2024-02-14',
-    scheduled_for: '2024-02-14'
+    created_at: '2024-02-28',
+    scheduled_for: '2024-02-29'
   }
 ];
 
@@ -71,39 +61,11 @@ const notificationTypes = [
 
 const automationSettings = [
   {
-    id: 'contribution_reminders',
-    name: 'Contribution Reminders',
-    description: 'Send automatic reminders for monthly contributions',
+    id: 'report_generation_reminder',
+    name: 'Monthly Report Generation Reminder',
+    description: 'Remind administrators to generate monthly reports before month end',
     enabled: true,
-    schedule: '3 days before due date'
-  },
-  {
-    id: 'loan_payment_reminders',
-    name: 'Loan Payment Reminders',
-    description: 'Remind members about upcoming loan payments',
-    enabled: true,
-    schedule: '7 days before due date'
-  },
-  {
-    id: 'meeting_reminders',
-    name: 'Meeting Reminders',
-    description: 'Send meeting notifications to all members',
-    enabled: true,
-    schedule: '24 hours before meeting'
-  },
-  {
-    id: 'overdue_alerts',
-    name: 'Overdue Payment Alerts',
-    description: 'Alert members about overdue payments',
-    enabled: false,
-    schedule: 'Daily for overdue items'
-  },
-  {
-    id: 'monthly_statements',
-    name: 'Monthly Statements',
-    description: 'Auto-generate and send monthly member statements',
-    enabled: false,
-    schedule: 'Last day of each month'
+    schedule: '2-3 days before end of month'
   }
 ];
 
@@ -170,7 +132,7 @@ export default function NotificationsView() {
       >
         <div>
           <h1 className="text-3xl font-bold text-foreground">Notifications & Automation</h1>
-          <p className="text-muted-foreground mt-1">Manage alerts, reminders, and automated features</p>
+          <p className="text-muted-foreground mt-1">Monthly report generation reminders</p>
         </div>
       </motion.div>
 

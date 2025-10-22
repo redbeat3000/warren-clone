@@ -36,6 +36,7 @@ const allNavigation = [
   { name: 'Members', id: 'members', icon: UsersIcon, roles: ['chairperson', 'treasurer', 'secretary'] },
   { name: 'Contributions', id: 'contributions', icon: CurrencyDollarIcon, roles: ['chairperson', 'treasurer', 'secretary', 'member'] },
   { name: 'Loans', id: 'loans', icon: BanknotesIcon, roles: ['chairperson', 'treasurer', 'secretary', 'member'] },
+  { name: 'Loan Repayments', id: 'loan-repayments', icon: DocumentTextIcon, roles: ['chairperson', 'treasurer', 'secretary', 'member'] },
   { name: 'Fines', id: 'fines', icon: ExclamationTriangleIcon, roles: ['chairperson', 'treasurer', 'secretary'] },
   { name: 'Expenses', id: 'expenses', icon: ArrowTrendingDownIcon, roles: ['chairperson', 'treasurer'] },
   { name: 'Income Tracking', id: 'income', icon: ArrowTrendingUpIcon, roles: ['chairperson', 'treasurer', 'secretary'] },

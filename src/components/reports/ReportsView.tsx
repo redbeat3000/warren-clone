@@ -41,6 +41,7 @@ export default function ReportsView() {
   const [transactions, setTransactions] = useState<FinancialTransaction[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<FinancialTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [members, setMembers] = useState<any[]>([]);
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -56,7 +57,7 @@ export default function ReportsView() {
   const [fundType, setFundType] = useState('all');
   const [moneyFlow, setMoneyFlow] = useState<'in' | 'out' | 'all'>('all');
   const [reportType, setReportType] = useState<'individual' | 'collective'>('collective');
-  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [selectedMember, setSelectedMember] = useState<string>('all');
 
   const transactionTypes = [
     { value: 'all', label: 'All Transactions' },
@@ -99,11 +100,27 @@ export default function ReportsView() {
 
   useEffect(() => {
     fetchFinancialTransactions();
+    fetchMembers();
   }, []);
 
   useEffect(() => {
     applyFilters();
-  }, [transactions, searchTerm, selectedType, dateFrom, dateTo, minAmount, maxAmount, selectedCategories, sortBy, sortOrder, fundType, moneyFlow]);
+  }, [transactions, searchTerm, selectedType, dateFrom, dateTo, minAmount, maxAmount, selectedCategories, sortBy, sortOrder, fundType, moneyFlow, selectedMember]);
+
+  const fetchMembers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, first_name, last_name, member_no, full_name')
+        .eq('status', 'active')
+        .order('member_no');
+      
+      if (error) throw error;
+      setMembers(data || []);
+    } catch (error) {
+      console.error('Error fetching members:', error);
+    }
+  };
 
   const fetchFinancialTransactions = async () => {
     try {
@@ -115,13 +132,15 @@ export default function ReportsView() {
         { data: loans },
         { data: repayments },
         { data: expenses },
-        { data: fines }
+        { data: fines },
+        { data: incomeRecords }
       ] = await Promise.all([
         supabase.from('contributions').select('*, users!contributions_member_id_fkey(first_name, last_name, member_no)').order('contribution_date', { ascending: false }),
         supabase.from('loans').select('*, users!loans_member_id_fkey(first_name, last_name, member_no)').order('issue_date', { ascending: false }),
         supabase.from('loan_repayments').select('*, users!loan_repayments_member_id_fkey(first_name, last_name, member_no)').order('payment_date', { ascending: false }),
         supabase.from('expenses').select('*').order('expense_date', { ascending: false }),
-        supabase.from('fines').select('*, users!fines_member_id_fkey(first_name, last_name, member_no)').order('fine_date', { ascending: false })
+        supabase.from('fines').select('*, users!fines_member_id_fkey(first_name, last_name, member_no)').order('fine_date', { ascending: false }),
+        supabase.from('income_records').select('*, income_categories!inner(name)').order('income_date', { ascending: false })
       ]);
 
       const allTransactions: FinancialTransaction[] = [];
@@ -216,6 +235,24 @@ export default function ReportsView() {
         });
       });
 
+      // Process income records
+      incomeRecords?.forEach(ir => {
+        allTransactions.push({
+          id: ir.id,
+          timestamp: ir.income_date,
+          actionType: 'INCOME_RECEIVED',
+          member: ir.income_categories?.name || 'Income',
+          amount: Number(ir.amount),
+          paymentMethod: ir.payment_method || 'N/A',
+          previousBalance: 0,
+          newBalance: 0,
+          authorizingOfficer: 'System',
+          referenceNumber: ir.receipt_no || `INC-${ir.id.substring(0, 8)}`,
+          description: ir.description || ir.income_categories?.name,
+          type: 'income'
+        });
+      });
+
       setTransactions(allTransactions);
     } catch (error) {
       console.error('Error fetching financial transactions:', error);
@@ -256,6 +293,11 @@ export default function ReportsView() {
       } else if (moneyFlow === 'out') {
         filtered = filtered.filter(t => ['expense', 'loan'].includes(t.type));
       }
+    }
+
+    // Member filter
+    if (selectedMember !== 'all') {
+      filtered = filtered.filter(t => t.member.toLowerCase().includes(selectedMember.toLowerCase()));
     }
 
     // Date range filter
@@ -314,7 +356,7 @@ export default function ReportsView() {
     setFundType('all');
     setMoneyFlow('all');
     setReportType('collective');
-    setSelectedMembers([]);
+    setSelectedMember('all');
   };
 
   const applyQuickPreset = (days: number) => {
@@ -372,7 +414,7 @@ export default function ReportsView() {
       fundType,
       minAmount: minAmount ? Number(minAmount) : undefined,
       maxAmount: maxAmount ? Number(maxAmount) : undefined,
-      memberIds: selectedMembers,
+      memberIds: selectedMember !== 'all' ? [selectedMember] : [],
       reportType,
       moneyFlow
     };
@@ -498,6 +540,24 @@ export default function ReportsView() {
                   {transactionTypes.map(type => (
                     <SelectItem key={type.value} value={type.value}>
                       {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Member Selection */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Select Member</label>
+              <Select value={selectedMember} onValueChange={setSelectedMember}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Members" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Members</SelectItem>
+                  {members.map(member => (
+                    <SelectItem key={member.id} value={member.full_name || `${member.first_name} ${member.last_name}`}>
+                      {member.member_no} - {member.full_name || `${member.first_name} ${member.last_name}`}
                     </SelectItem>
                   ))}
                 </SelectContent>

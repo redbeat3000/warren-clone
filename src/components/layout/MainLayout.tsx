@@ -6,6 +6,7 @@ import DashboardOverview from '../dashboard/DashboardOverview';
 import MembersList from '../members/MembersList';
 import ContributionsView from '../contributions/ContributionsView';
 import LoansView from '../loans/LoansView';
+import LoanRepaymentsView from '../loans/LoanRepaymentsView';
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -24,6 +25,7 @@ const sectionComponents = {
   members: MembersList,
   contributions: ContributionsView,
   loans: LoansView,
+  'loan-repayments': LoanRepaymentsView,
   fines: FinesView,
   expenses: ExpensesView,
   reports: ReportsView,
@@ -39,6 +41,7 @@ const sectionTitles = {
   members: 'Members',
   contributions: 'Contributions',
   loans: 'Loans',
+  'loan-repayments': 'Loan Repayments',
   fines: 'Fines',
   expenses: 'Expenses',
   reports: 'Reports & Analytics',

@@ -16,12 +16,12 @@ export default function IncomeDashboard() {
   const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
   const [filterCategory, setFilterCategory] = useState('all');
   const [loading, setLoading] = useState(true);
-  
-  const [loanInterest, setLoanInterest] = useState(0);
-  const [registrationFees, setRegistrationFees] = useState(0);
-  const [finesCollected, setFinesCollected] = useState(0);
-  const [totalExpenses, setTotalExpenses] = useState(0);
+
+  const [summary, setSummary] = useState<any>({});
+  const [yearlyTotalIncome, setYearlyTotalIncome] = useState(0);
+  const [yearlyTotalExpenses, setYearlyTotalExpenses] = useState(0);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [finesCollected, setFinesCollected] = useState(0); // Still needed for yearly fine total
 
   useEffect(() => {
     fetchIncomeData();
@@ -30,105 +30,68 @@ export default function IncomeDashboard() {
   const fetchIncomeData = async () => {
     try {
       setLoading(true);
+
+      // Define yearly date range
+      const currentYear = new Date().getFullYear();
+      const yearStart = new Date(currentYear, 0, 1).toISOString().split('T')[0];
+      const yearEnd = new Date(currentYear, 11, 31).toISOString().split('T')[0];
+
+      const [
+        { data: transactionData, error: transactionError },
+        { data: yearlyExpensesData, error: expensesError }
+      ] = await Promise.all([
+        supabase.from('transaction_summary').select('*').gte('date', yearStart).lte('date', yearEnd),
+        supabase.from('expenses').select('amount').gte('expense_date', yearStart).lte('expense_date', yearEnd)
+      ]);
+
+      if (transactionError) throw transactionError;
+      if (expensesError) throw expensesError;
+
+      const allYearlyTransactions = transactionData || [];
+
+      // --- Yearly Calculations for Net Profit ---
+      const yearlyInterest = allYearlyTransactions.filter(t => t.category === 'Loan Interest').reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+      const yearlyRegFees = allYearlyTransactions.filter(t => t.category === 'Registration Fee').reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+      const yearlyFines = allYearlyTransactions.filter(t => t.category === 'Fine Payment').reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
+      const totalYearlyProfitSources = yearlyInterest + yearlyRegFees + yearlyFines;
       
-      // Fetch Loan Interest
-      const { data: interestData } = await supabase
-        .from('loan_repayments')
-        .select('interest_portion, payment_date, amount, loans!inner(users!inner(first_name, last_name, member_no))')
-        .gte('payment_date', dateFrom)
-        .lte('payment_date', dateTo);
+      setFinesCollected(yearlyFines); // This state variable is specifically for the yearly total on the Fines Collected card.
+      setYearlyTotalIncome(totalYearlyProfitSources);
 
-      const totalInterest = (interestData || []).reduce((sum, r) => sum + (Number(r.interest_portion) || 0), 0);
-      setLoanInterest(totalInterest);
+      const totalYearlyExp = (yearlyExpensesData || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+      setYearlyTotalExpenses(totalYearlyExp);
 
-      // Fetch Registration Fees
-      const { data: regFeesData } = await supabase
-        .from('contributions')
-        .select('amount, contribution_date, users!inner(first_name, last_name, member_no)')
-        .eq('contribution_type', 'registration_fee')
-        .gte('contribution_date', dateFrom)
-        .lte('contribution_date', dateTo);
-
-      const totalRegFees = (regFeesData || []).reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
-      setRegistrationFees(totalRegFees);
-
-      // Fetch Fines
-      const { data: finesData } = await supabase
-        .from('fines')
-        .select('paid_amount, fine_date, reason, users!inner(first_name, last_name, member_no)')
-        .gte('fine_date', dateFrom)
-        .lte('fine_date', dateTo);
-
-      const totalFines = (finesData || []).reduce((sum, f) => sum + (Number(f.paid_amount) || 0), 0);
-      setFinesCollected(totalFines);
-
-      // Fetch Expenses
-      const { data: expensesData } = await supabase
-        .from('expenses')
-        .select('amount, expense_date, description, category')
-        .gte('expense_date', dateFrom)
-        .lte('expense_date', dateTo);
-
-      const totalExp = (expensesData || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-      setTotalExpenses(totalExp);
-
-      // Combine all transactions for the table
-      const allTransactions: any[] = [];
-
-      // Add interest transactions
-      (interestData || []).forEach((item: any) => {
-        allTransactions.push({
-          date: item.payment_date,
-          category: 'Loan Interest',
-          source: `${item.loans.users.first_name} ${item.loans.users.last_name} (${item.loans.users.member_no})`,
-          amount: Number(item.interest_portion) || 0,
-          type: 'income',
-          description: `Loan interest payment`
-        });
+      // --- Filter data for the selected date range ---
+      const filteredData = allYearlyTransactions.filter(t => {
+        const transactionDate = new Date(t.date);
+        return transactionDate >= new Date(dateFrom) && transactionDate <= new Date(dateTo);
       });
 
-      // Add registration fees
-      (regFeesData || []).forEach((item: any) => {
-        allTransactions.push({
-          date: item.contribution_date,
-          category: 'Registration Fees',
-          source: `${item.users.first_name} ${item.users.last_name} (${item.users.member_no})`,
-          amount: Number(item.amount) || 0,
-          type: 'income',
-          description: 'Member registration fee'
-        });
-      });
+      // Calculate summaries for cards
+      const newSummary = filteredData.reduce((acc, t) => {
+        // Ensure pluralization for keys to match component state
+        const category = (t.category.toLowerCase().replace(/ /g, '_')) + 's';
+        acc[category] = (acc[category] || 0) + t.amount;
+        return acc;
+      }, {});
+      setSummary(newSummary);
 
-      // Add fines
-      (finesData || []).forEach((item: any) => {
-        allTransactions.push({
-          date: item.fine_date,
-          category: 'Fines',
-          source: `${item.users.first_name} ${item.users.last_name} (${item.users.member_no})`,
-          amount: Number(item.paid_amount) || 0,
-          type: 'income',
-          description: item.reason || 'Fine payment'
-        });
-      });
-
-      // Add expenses
-      (expensesData || []).forEach((item: any) => {
-        allTransactions.push({
-          date: item.expense_date,
-          category: 'Expenses',
-          source: item.category || 'General',
-          amount: Number(item.amount) || 0,
-          type: 'expense',
-          description: item.description || 'Expense'
-        });
-      });
+      // Prepare transactions for the table view
+      const allTransactions = filteredData.map(t => ({
+        date: t.date,
+        category: t.category,
+        source: t.member_name || t.source || 'N/A',
+        amount: t.amount,
+        type: t.type,
+        description: t.description,
+      }));
 
       // Sort by date descending
       allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       // Filter by category if needed
       if (filterCategory !== 'all') {
-        setTransactions(allTransactions.filter(t => t.category.toLowerCase() === filterCategory.toLowerCase()));
+        setTransactions(allTransactions.filter(t => t.category.toLowerCase().replace(/ /g, '_') + 's' === filterCategory.toLowerCase()));
       } else {
         setTransactions(allTransactions);
       }
@@ -140,8 +103,24 @@ export default function IncomeDashboard() {
     }
   };
 
-  const netIncome = loanInterest + registrationFees + finesCollected - totalExpenses;
+  const regularContributions = summary.regular_contributions || summary.regular_contribution || 0;
+  const xmasSavings = summary.xmas_savingss || 0;
+  const landFund = summary.land_funds || 0;
+  const securityFund = summary.security_funds || 0;
+  const teaFund = summary.tea_fund || 0;
+  const loanInterest = summary.loan_interest || 0;
+  const registrationFees = summary.registration_fees || 0;
 
+  // Total Income = Only actual income sources (Interest + Fees + Fines)
+  // NOT member contributions (those are member savings, not organizational income)
+  // This is for the date-filtered "Total Income" card
+  const totalIncome = (summary.loan_interests || 0) + (summary.registration_fees || 0) + (summary.fine_payments || 0);
+
+  // Net Income for the whole year
+  const netIncome = yearlyTotalIncome - yearlyTotalExpenses;
+  
+  // Total Contributions (for display purposes)
+  const totalContributions = regularContributions + xmasSavings + landFund + securityFund + teaFund;
   const handleExport = () => {
     // Create CSV
     const headers = ['Date', 'Category', 'Source', 'Description', 'Amount', 'Type'];
@@ -200,6 +179,94 @@ export default function IncomeDashboard() {
         >
           <div className="flex items-center justify-between">
             <div>
+              <p className="text-sm font-medium text-muted-foreground">Regular Contributions</p>
+              <p className="text-2xl font-bold text-blue-600 mt-2">KES {regularContributions.toLocaleString()}</p>
+            </div>
+            <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
+              <CurrencyDollarIcon className="h-6 w-6 text-blue-600" />
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="card-elevated p-6"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Xmas Savings</p>
+              <p className="text-2xl font-bold text-green-600 mt-2">KES {xmasSavings.toLocaleString()}</p>
+            </div>
+            <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <CurrencyDollarIcon className="h-6 w-6 text-green-600" />
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="card-elevated p-6"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Land Fund</p>
+              <p className="text-2xl font-bold text-amber-600 mt-2">KES {landFund.toLocaleString()}</p>
+            </div>
+            <div className="h-12 w-12 bg-amber-100 rounded-lg flex items-center justify-center">
+              <CurrencyDollarIcon className="h-6 w-6 text-amber-600" />
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="card-elevated p-6"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Security Fund</p>
+              <p className="text-2xl font-bold text-purple-600 mt-2">KES {securityFund.toLocaleString()}</p>
+            </div>
+            <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <CurrencyDollarIcon className="h-6 w-6 text-purple-600" />
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="card-elevated p-6"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Tea Fund</p>
+              <p className="text-2xl font-bold text-teal-600 mt-2">KES {teaFund.toLocaleString()}</p>
+            </div>
+            <div className="h-12 w-12 bg-teal-100 rounded-lg flex items-center justify-center">
+              <CurrencyDollarIcon className="h-6 w-6 text-teal-600" />
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Secondary Income Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="card-elevated p-6"
+        >
+          <div className="flex items-center justify-between">
+            <div>
               <p className="text-sm font-medium text-muted-foreground">Loan Interest</p>
               <p className="text-2xl font-bold text-primary mt-2">KES {loanInterest.toLocaleString()}</p>
             </div>
@@ -212,7 +279,7 @@ export default function IncomeDashboard() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: 0.6 }}
           className="card-elevated p-6"
         >
           <div className="flex items-center justify-between">
@@ -229,7 +296,7 @@ export default function IncomeDashboard() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+          transition={{ delay: 0.7 }}
           className="card-elevated p-6"
         >
           <div className="flex items-center justify-between">
@@ -246,41 +313,73 @@ export default function IncomeDashboard() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.8 }}
           className="card-elevated p-6"
         >
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Total Expenses</p>
-              <p className="text-2xl font-bold text-destructive mt-2">KES {totalExpenses.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-destructive mt-2">KES {yearlyTotalExpenses.toLocaleString()}</p>
             </div>
             <div className="h-12 w-12 bg-destructive/10 rounded-lg flex items-center justify-center">
               <ArrowTrendingDownIcon className="h-6 w-6 text-destructive" />
             </div>
           </div>
         </motion.div>
+      </div>
 
+      {/* Income Summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Total Contributions */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="card-elevated p-6 bg-accent/5"
+          transition={{ delay: 0.9 }}
+          className="card-elevated p-8 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20"
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Net Income</p>
-              <p className={`text-2xl font-bold mt-2 ${netIncome >= 0 ? 'text-success' : 'text-destructive'}`}>
-                KES {netIncome.toLocaleString()}
-              </p>
+              <p className="text-sm font-medium text-muted-foreground">Total Member Contributions</p>
+              <p className="text-3xl font-bold text-green-600 mt-2">KES {totalContributions.toLocaleString()}</p>
               <p className="text-xs text-muted-foreground mt-1">
-                (Interest + Fees + Fines) - Expenses
+                Member savings (not organizational income)
               </p>
             </div>
-            <div className={`h-12 w-12 rounded-lg flex items-center justify-center ${netIncome >= 0 ? 'bg-success/10' : 'bg-destructive/10'}`}>
+            <div className="h-16 w-16 rounded-lg flex items-center justify-center bg-green-100">
+              <CurrencyDollarIcon className="h-8 w-8 text-green-600" />
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Net Income */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.0 }}
+          className="card-elevated p-8 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Income (Filtered Period)</p>
+              <p className="text-3xl font-bold text-blue-600 mt-2">KES {totalIncome.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Interest + Fees + Fines
+              </p>
+              <div className="mt-4 pt-4 border-t">
+                <p className="text-sm font-medium text-muted-foreground">Net Profit (This Year)</p>
+                <p className={`text-2xl font-bold mt-1 ${netIncome >= 0 ? 'text-success' : 'text-destructive'}`}>
+                  KES {netIncome.toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Yearly Income - Yearly Expenses
+                </p>
+              </div>
+            </div>
+            <div className={`h-16 w-16 rounded-lg flex items-center justify-center ${netIncome >= 0 ? 'bg-success/10' : 'bg-destructive/10'}`}>
               {netIncome >= 0 ? (
-                <ArrowTrendingUpIcon className="h-6 w-6 text-success" />
+                <ArrowTrendingUpIcon className="h-8 w-8 text-success" />
               ) : (
-                <ArrowTrendingDownIcon className="h-6 w-6 text-destructive" />
+                <ArrowTrendingDownIcon className="h-8 w-8 text-destructive" />
               )}
             </div>
           </div>
@@ -328,9 +427,14 @@ export default function IncomeDashboard() {
               className="px-3 py-2 border border-input-border rounded-lg bg-input text-sm focus:outline-none focus:ring-2 focus:ring-accent-border"
             >
               <option value="all">All Categories</option>
-              <option value="loan interest">Loan Interest</option>
-              <option value="registration fees">Registration Fees</option>
-              <option value="fines">Fines</option>
+              <option value="regular_contributions">Regular Contribution</option>
+              <option value="xmas_savingss">Xmas Savings</option>
+              <option value="land_funds">Land Fund</option>
+              <option value="security_funds">Security Fund</option>
+              <option value="tea_funds">Tea Fund</option>
+              <option value="loan_interests">Loan Interest</option>
+              <option value="registration_fees">Registration Fee</option>
+              <option value="fine_payments">Fine Payment</option>
               <option value="expenses">Expenses</option>
             </select>
           </div>
@@ -399,9 +503,14 @@ export default function IncomeDashboard() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                        transaction.category === 'Regular Contribution' ? 'bg-blue-100 text-blue-700' :
+                        transaction.category === 'Xmas Savings' ? 'bg-green-100 text-green-700' :
+                        transaction.category === 'Land Fund' ? 'bg-amber-100 text-amber-700' :
+                        transaction.category === 'Security Fund' ? 'bg-purple-100 text-purple-700' :
+                        transaction.category === 'Tea Fund' ? 'bg-teal-100 text-teal-700' :
                         transaction.category === 'Loan Interest' ? 'bg-primary/10 text-primary' :
-                        transaction.category === 'Registration Fees' ? 'bg-success/10 text-success' :
-                        transaction.category === 'Fines' ? 'bg-warning/10 text-warning' :
+                        transaction.category === 'Registration Fee' ? 'bg-success/10 text-success' :
+                        transaction.category === 'Fine Payment' ? 'bg-warning/10 text-warning' :
                         'bg-destructive/10 text-destructive'
                       }`}>
                         {transaction.category}

@@ -11,10 +11,17 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '@/hooks/useAuth';
+import { DocumentArrowDownIcon } from '@heroicons/react/24/outline';
 
 const contributionSchema = z.object({
   memberId: z.string().min(1, 'Member is required'),
   regularAmount: z.string().optional(),
+  landFundAmount: z.string().optional(),
+  securityFundAmount: z.string().optional(),
+  teaFundAmount: z.string().optional(),
+  xmasSavingsAmount: z.string().optional(),
+  registrationFeeAmount: z.string().optional(),
   fineAmount: z.string().optional(),
   loanRepaymentAmount: z.string().optional(),
   loanId: z.string().optional(),
@@ -24,10 +31,36 @@ const contributionSchema = z.object({
   notes: z.string().optional(),
   contributionDate: z.string().min(1, 'Date is required'),
 }).refine((data) => {
-  const totalAmount = (Number(data.regularAmount) || 0) + (Number(data.fineAmount) || 0) + (Number(data.loanRepaymentAmount) || 0);
+  const totalAmount = (Number(data.regularAmount) || 0) + 
+                      (Number(data.landFundAmount) || 0) + 
+                      (Number(data.securityFundAmount) || 0) + 
+                      (Number(data.teaFundAmount) || 0) + 
+                      (Number(data.xmasSavingsAmount) || 0) + 
+                      (Number(data.registrationFeeAmount) || 0) + 
+                      (Number(data.fineAmount) || 0) + 
+                      (Number(data.loanRepaymentAmount) || 0);
   return totalAmount > 0;
 }, {
   message: 'At least one contribution type must have an amount',
+  path: ['regularAmount'], // Show error on the first amount field
+}).refine((data) => {
+  // If a fine amount is entered, a fine must be selected
+  if ((Number(data.fineAmount) || 0) > 0) {
+    return !!data.fineId;
+  }
+  return true;
+}, {
+  message: 'You must select a fine to pay if you enter a fine amount.',
+  path: ['fineId'],
+}).refine((data) => {
+  // If a loan repayment amount is entered, a loan must be selected
+  if ((Number(data.loanRepaymentAmount) || 0) > 0) {
+    return !!data.loanId;
+  }
+  return true;
+}, {
+  message: 'You must select a loan to repay if you enter a repayment amount.',
+  path: ['loanId'],
 });
 
 type ContributionFormData = z.infer<typeof contributionSchema>;
@@ -36,6 +69,7 @@ interface Member {
   id: string;
   first_name: string;
   last_name: string;
+  member_number: string; // Added member_number
   full_name: string;
 }
 
@@ -44,6 +78,7 @@ interface Loan {
   principal: number;
   balance?: number;
   member_id: string;
+  interest_paid: number;
 }
 
 interface Fine {
@@ -61,16 +96,23 @@ interface AddContributionFormProps {
 
 export default function AddContributionForm({ onSuccess, onClose }: AddContributionFormProps) {
   const { toast } = useToast();
+  const { authUser } = useAuth();
   const [members, setMembers] = useState<Member[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
   const [fines, setFines] = useState<Fine[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalAmount, setTotalAmount] = useState(0);
 
   const form = useForm<ContributionFormData>({
     resolver: zodResolver(contributionSchema),
     defaultValues: {
       memberId: '',
       regularAmount: '',
+      landFundAmount: '',
+      securityFundAmount: '',
+      teaFundAmount: '',
+      xmasSavingsAmount: '',
+      registrationFeeAmount: '',
       fineAmount: '',
       loanRepaymentAmount: '',
       loanId: '',
@@ -82,24 +124,59 @@ export default function AddContributionForm({ onSuccess, onClose }: AddContribut
     },
   });
 
+  const watchedAmounts = form.watch([
+    'regularAmount',
+    'landFundAmount',
+    'securityFundAmount',
+    'teaFundAmount',
+    'xmasSavingsAmount',
+    'registrationFeeAmount',
+    'fineAmount',
+    'loanRepaymentAmount',
+  ]);
+
+  useEffect(() => {
+    const total = watchedAmounts.reduce((sum, current) => {
+      return sum + (Number(current) || 0);
+    }, 0);
+    setTotalAmount(total);
+  }, [watchedAmounts]);
+
   useEffect(() => {
     const loadData = async () => {
-      await fetchMembers();
-      await fetchLoans();
-      await fetchFines();
+      setLoading(true);
+      try {
+        await fetchMembers();
+      } finally {
+        setLoading(false);
+      }
     };
     loadData();
-  }, [fetchMembers]);
+  }, []); // Empty dependency array - only run once on mount
 
-  const fetchMembers = useCallback(async () => {
+  const selectedMemberId = form.watch('memberId');
+
+  useEffect(() => {
+    if (selectedMemberId) {
+      fetchLoans(selectedMemberId);
+      fetchFines(selectedMemberId);
+    } else {
+      setLoans([]);
+      setFines([]);
+    }
+  }, [selectedMemberId]);
+
+  const fetchMembers = async () => {
     try {
       const { data, error } = await supabase
-        .from('users')
-        .select('id, first_name, last_name, full_name')
+        .from('users') // Assuming 'users' table contains member information
+        .select('id, first_name, last_name, full_name, member_number') // Select member_number
         .eq('status', 'active')
-        .order('first_name');
+        .order('full_name');
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(`Failed to fetch members: ${error.message}`);
+      }
       setMembers(data || []);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch members';
@@ -109,34 +186,36 @@ export default function AddContributionForm({ onSuccess, onClose }: AddContribut
         variant: 'destructive',
       });
     }
-  }, [toast]);
+  };
 
-  const fetchLoans = async () => {
+  const fetchLoans = async (memberId: string) => {
     try {
       const { data, error } = await supabase
         .from('loans')
-        .select('id, principal, member_id')
+        .select('id, principal, interest_paid, member_id, users (full_name), loan_repayments(amount)')
         .eq('status', 'active')
+        .eq('member_id', memberId)
         .order('issue_date', { ascending: false });
 
       if (error) throw error;
-      setLoans((data || []).map(loan => ({
-        id: loan.id,
-        principal: loan.principal,
-        member_id: loan.member_id,
-        balance: loan.principal // Use principal as balance for now
-      })));
+      const loansWithBalance = (data || []).map(loan => {
+        const totalRepaid = loan.loan_repayments.reduce((sum, p) => sum + p.amount, 0);
+        const totalOwed = loan.principal_amount + (loan.total_interest || 0);
+        return { ...loan, balance: totalOwed - totalRepaid };
+      });
+      setLoans(loansWithBalance);
     } catch (error: unknown) {
       console.error('Error fetching loans:', error);
     }
   };
 
-  const fetchFines = async () => {
+  const fetchFines = async (memberId: string) => {
     try {
       const { data, error } = await supabase
         .from('fines')
         .select('id, amount, paid_amount, member_id, reason')
         .neq('status', 'paid')
+        .eq('member_id', memberId)
         .order('fine_date', { ascending: false });
 
       if (error) throw error;
@@ -148,105 +227,59 @@ export default function AddContributionForm({ onSuccess, onClose }: AddContribut
 
   const onSubmit = async (data: ContributionFormData) => {
     try {
-      const selectedMember = members.find(m => m.id === data.memberId);
-      const memberName = selectedMember ? `${selectedMember.first_name} ${selectedMember.last_name}` : 'Unknown';
+      const contributionsPayload: { [key: string]: number } = {};
+      if (data.regularAmount && +data.regularAmount > 0) contributionsPayload['regular'] = +data.regularAmount;
+      if (data.landFundAmount && +data.landFundAmount > 0) contributionsPayload['land_fund'] = +data.landFundAmount;
+      if (data.securityFundAmount && +data.securityFundAmount > 0) contributionsPayload['security_fund'] = +data.securityFundAmount;
+      if (data.teaFundAmount && +data.teaFundAmount > 0) contributionsPayload['tea_fund'] = +data.teaFundAmount;
+      if (data.xmasSavingsAmount && +data.xmasSavingsAmount > 0) contributionsPayload['xmas_savings'] = +data.xmasSavingsAmount;
+      if (data.registrationFeeAmount && +data.registrationFeeAmount > 0) contributionsPayload['registration_fee'] = +data.registrationFeeAmount;
 
-      // Handle Regular Contributions
-      if (data.regularAmount && Number(data.regularAmount) > 0) {
-      const contributionData = {
-        member_id: data.memberId,
-          amount: Number(data.regularAmount),
-          contribution_type: 'regular' as const,
-          is_dividend_eligible: false,
-        payment_method: data.paymentMethod || null,
-        receipt_no: data.receiptNo || null,
-        notes: data.notes || null,
-        contribution_date: data.contributionDate,
-      };
-
-      const { data: result, error } = await supabase
-        .from('contributions')
-        .insert(contributionData)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      await auditLogger.logDataChange('create', 'contributions', result.id, {
-          member_name: memberName,
-          amount: Number(data.regularAmount),
-          type: 'regular_contribution',
-          payment_method: data.paymentMethod,
-          contribution_date: data.contributionDate,
-          receipt_no: data.receiptNo
-        });
+      const finePaymentsPayload: { [key: string]: number } = {};
+      if (data.fineId && data.fineAmount && +data.fineAmount > 0) {
+        finePaymentsPayload[data.fineId] = +data.fineAmount;
       }
 
-      // Handle Fine Payments
-      if (data.fineAmount && Number(data.fineAmount) > 0 && data.fineId) {
-        const fine = fines.find(f => f.id === data.fineId);
-        if (fine) {
-          const newPaidAmount = fine.paid_amount + Number(data.fineAmount);
-          const newStatus = newPaidAmount >= fine.amount ? 'paid' : 'partially_paid';
-
-          const { error: fineError } = await supabase
-            .from('fines')
-            .update({
-              paid_amount: newPaidAmount,
-              status: newStatus
-            })
-            .eq('id', data.fineId);
-
-          if (fineError) throw fineError;
-
-          await auditLogger.logDataChange('update', 'fines', data.fineId, {
-            member_name: memberName,
-            amount: Number(data.fineAmount),
-            type: 'fine_payment',
-            payment_method: data.paymentMethod,
-            contribution_date: data.contributionDate,
-            receipt_no: data.receiptNo
-          });
-        }
+      const loanRepaymentsPayload: { [key: string]: number } = {};
+      if (data.loanId && data.loanRepaymentAmount && +data.loanRepaymentAmount > 0) {
+        loanRepaymentsPayload[data.loanId] = +data.loanRepaymentAmount;
       }
 
-      // Handle Loan Repayments
-      if (data.loanRepaymentAmount && Number(data.loanRepaymentAmount) > 0 && data.loanId) {
-        const loan = loans.find(l => l.id === data.loanId);
-        if (loan) {
-          // Calculate interest portion (1.5% per month on reducing balance)
-          const interestRate = 0.015; // 1.5% per month
-          const interestPortion = loan.balance * interestRate;
-          const principalPortion = Number(data.loanRepaymentAmount) - interestPortion;
-
-          const { error: repaymentError } = await supabase
-            .from('loan_repayments')
-            .insert({
-              loan_id: data.loanId,
-              member_id: data.memberId,
-              amount: Number(data.loanRepaymentAmount),
-              principal_portion: Math.max(0, principalPortion),
-              interest_portion: Math.min(interestPortion, Number(data.loanRepaymentAmount)),
-              payment_date: data.contributionDate,
-              payment_method: data.paymentMethod || null
-            });
-
-          if (repaymentError) throw repaymentError;
-
-          await auditLogger.logDataChange('create', 'loan_repayments', data.loanId, {
-            member_name: memberName,
-            amount: Number(data.loanRepaymentAmount),
-            type: 'loan_repayment',
-        payment_method: data.paymentMethod,
-        contribution_date: data.contributionDate,
-        receipt_no: data.receiptNo
+      const { data: rpcData, error } = await supabase.rpc('process_member_transaction', {
+        p_member_id: data.memberId,
+        p_contributions: contributionsPayload,
+        p_fine_payments: finePaymentsPayload,
+        p_loan_repayments: loanRepaymentsPayload,
+        p_transaction_date: data.contributionDate,
+        p_payment_method: data.paymentMethod,
+        p_receipt_no: data.receiptNo,
+        p_notes: data.notes,
+            p_created_by: authUser?.id
       });
-        }
+
+      if (error) {
+        console.error('RPC Error:', error);
+        throw error;
       }
+
+      // Manually trigger a refetch for loans view to ensure status is updated
+      // This is a failsafe to ensure UI consistency after a complex transaction.
+      onSuccess();
+      
+      // Optional: Log the master transaction
+      const selectedMember = members.find(m => m.id === data.memberId);
+      await auditLogger.logDataChange('create', 'contribution_transactions', rpcData, {
+        member_name: selectedMember?.full_name || 'Unknown',
+        total_amount: Object.values(contributionsPayload).reduce((s, a) => s + a, 0) +
+                      Object.values(finePaymentsPayload).reduce((s, a) => s + a, 0) +
+                      Object.values(loanRepaymentsPayload).reduce((s, a) => s + a, 0),
+        receipt_no: data.receiptNo,
+        transaction_date: data.contributionDate,
+      });
 
       toast({
         title: 'Success',
-        description: 'Contributions recorded successfully',
+        description: 'Transaction recorded successfully.',
       });
 
       onSuccess();
@@ -260,6 +293,31 @@ export default function AddContributionForm({ onSuccess, onClose }: AddContribut
       });
     }
   };
+
+  const handleDownloadDraftPDF = async () => {
+    try {
+      // Dynamically import the PDF generation utility
+      const { generateContributionFormPDF } = await import('@/utils/contributionFormPDF');
+      const formData = form.getValues();
+      const selectedMember = members.find(m => m.id === formData.memberId);
+      generateContributionFormPDF(formData, selectedMember, loans, fines, totalAmount);
+      toast({ title: 'Downloading PDF', description: 'Your contribution form draft is being generated.' });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({ title: 'Error', description: 'Failed to generate PDF draft.', variant: 'destructive' });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="text-muted-foreground">Loading form data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -307,27 +365,135 @@ export default function AddContributionForm({ onSuccess, onClose }: AddContribut
           />
 
           {/* Contribution Types Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Regular Contributions */}
-            <div className="space-y-4 p-4 border rounded-lg bg-green-50 dark:bg-green-950/20">
-              <div className="flex items-center space-x-2">
-                <div className="h-3 w-3 bg-green-500 rounded-full"></div>
-                <h3 className="text-lg font-semibold text-green-800 dark:text-green-200">Regular Contributions</h3>
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-foreground">Contribution Types</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Regular Contributions */}
+              <div className="space-y-2 p-4 border rounded-lg bg-green-50 dark:bg-green-950/20">
+                <div className="flex items-center space-x-2">
+                  <div className="h-3 w-3 bg-green-500 rounded-full"></div>
+                  <h4 className="font-semibold text-green-800 dark:text-green-200">Regular</h4>
+                </div>
+                <FormField
+                  control={form.control}
+                  name="regularAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input placeholder="Amount (KES)" type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-              <FormField
-                control={form.control}
-                name="regularAmount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Regular Savings Amount (KES)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter amount" type="number" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+
+              {/* Land Fund */}
+              <div className="space-y-2 p-4 border rounded-lg bg-green-50 dark:bg-green-950/20">
+                <div className="flex items-center space-x-2">
+                  <div className="h-3 w-3 bg-green-500 rounded-full"></div>
+                  <h4 className="font-semibold text-green-800 dark:text-green-200">Land Fund</h4>
+                </div>
+                <FormField
+                  control={form.control}
+                  name="landFundAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input placeholder="Amount (KES)" type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Security Fund */}
+              <div className="space-y-2 p-4 border rounded-lg bg-green-50 dark:bg-green-950/20">
+                <div className="flex items-center space-x-2">
+                  <div className="h-3 w-3 bg-green-500 rounded-full"></div>
+                  <h4 className="font-semibold text-green-800 dark:text-green-200">Security Fund</h4>
+                </div>
+                <FormField
+                  control={form.control}
+                  name="securityFundAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input placeholder="Amount (KES)" type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Tea Fund */}
+              <div className="space-y-2 p-4 border rounded-lg bg-green-50 dark:bg-green-950/20">
+                <div className="flex items-center space-x-2">
+                  <div className="h-3 w-3 bg-green-500 rounded-full"></div>
+                  <h4 className="font-semibold text-green-800 dark:text-green-200">Tea Fund</h4>
+                </div>
+                <FormField
+                  control={form.control}
+                  name="teaFundAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input placeholder="Amount (KES)" type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Xmas Savings */}
+              <div className="space-y-2 p-4 border rounded-lg bg-green-50 dark:bg-green-950/20">
+                <div className="flex items-center space-x-2">
+                  <div className="h-3 w-3 bg-green-500 rounded-full"></div>
+                  <h4 className="font-semibold text-green-800 dark:text-green-200">Xmas Savings</h4>
+                </div>
+                <FormField
+                  control={form.control}
+                  name="xmasSavingsAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input placeholder="Amount (KES)" type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Registration Fee */}
+              <div className="space-y-2 p-4 border rounded-lg bg-green-50 dark:bg-green-950/20">
+                <div className="flex items-center space-x-2">
+                  <div className="h-3 w-3 bg-green-500 rounded-full"></div>
+                  <h4 className="font-semibold text-green-800 dark:text-green-200">Registration Fee</h4>
+                </div>
+                <FormField
+                  control={form.control}
+                  name="registrationFeeAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input placeholder="Amount (KES)" type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
+          </div>
+
+          {/* Other Payment Types */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-foreground">Other Payments</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
             {/* Fine Payments */}
             <div className="space-y-4 p-4 border rounded-lg bg-yellow-50 dark:bg-yellow-950/20">
@@ -350,7 +516,7 @@ export default function AddContributionForm({ onSuccess, onClose }: AddContribut
                       <SelectContent>
                         {fines.map((fine) => (
                           <SelectItem key={fine.id} value={fine.id}>
-                            {fine.reason} - KES {fine.amount.toLocaleString()} (Paid: {fine.paid_amount.toLocaleString()})
+                            {fine.reason} - KES {(fine.amount - fine.paid_amount).toLocaleString()} due
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -395,7 +561,7 @@ export default function AddContributionForm({ onSuccess, onClose }: AddContribut
                   <SelectContent>
                         {loans.map((loan) => (
                           <SelectItem key={loan.id} value={loan.id}>
-                            Loan #{loan.id.slice(-3)} - KES {loan.principal.toLocaleString()}
+                            Loan #{loan.id.slice(-4)} - KES {(loan.balance ?? 0).toLocaleString()} due
                           </SelectItem>
                         ))}
                   </SelectContent>
@@ -418,6 +584,7 @@ export default function AddContributionForm({ onSuccess, onClose }: AddContribut
                 )}
               />
             </div>
+          </div>
           </div>
 
           {/* Common Fields */}
@@ -490,7 +657,19 @@ export default function AddContributionForm({ onSuccess, onClose }: AddContribut
           />
           </div>
 
+          {/* Total Amount Display */}
+          <div className="mt-6 pt-4 border-t border-border">
+            <div className="flex justify-between items-center text-lg font-bold text-foreground">
+              <span>Total Amount:</span>
+              <span>KES {totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+          </div>
+
           <div className="flex justify-end space-x-2 pt-4">
+            <Button type="button" variant="outline" onClick={handleDownloadDraftPDF} disabled={!form.formState.isDirty && totalAmount === 0}>
+              <DocumentArrowDownIcon className="h-4 w-4 mr-2" />
+              Download Draft PDF
+            </Button>
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>

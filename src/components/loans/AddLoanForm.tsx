@@ -32,9 +32,8 @@ type LoanFormData = z.infer<typeof loanSchema>;
 
 interface Member {
   id: string;
-  first_name: string;
-  last_name: string;
   full_name: string;
+  member_number: string;
 }
 
 interface AddLoanFormProps {
@@ -62,21 +61,22 @@ export default function AddLoanForm({ onSuccess, onClose }: AddLoanFormProps) {
   useEffect(() => {
     fetchMembers();
   }, []);
-
   const fetchMembers = async () => {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('id, first_name, last_name, full_name')
+        .select('id, full_name, member_number')
         .eq('status', 'active')
-        .order('first_name');
+        .order('full_name');
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(`Failed to fetch members: ${error.message}`);
+      }
       setMembers(data || []);
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: 'Failed to fetch members',
+        description: error.message || 'Failed to fetch members',
         variant: 'destructive',
       });
     }
@@ -105,15 +105,16 @@ export default function AddLoanForm({ onSuccess, onClose }: AddLoanFormProps) {
       }
 
       const loanData = {
+        loan_number: `LN-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
         member_id: data.memberId,
-        principal,
+        principal_amount: principal,
         interest_rate: interestRate,
         term_months: termMonths,
         interest_type: data.interestType,
         issue_date: data.issueDate,
         due_date: dueDate,
         notes: data.notes || null,
-        total_interest_calculated: totalInterest,
+        total_interest: totalInterest,
         interest_paid: 0,
         status: 'active' as any,
       };
@@ -129,7 +130,7 @@ export default function AddLoanForm({ onSuccess, onClose }: AddLoanFormProps) {
       // Log the loan creation
       const selectedMember = members.find(m => m.id === data.memberId);
       await auditLogger.logDataChange('create', 'loans', result.id, {
-        member_name: selectedMember ? `${selectedMember.first_name} ${selectedMember.last_name}` : 'Unknown',
+        member_name: selectedMember ? selectedMember.full_name : 'Unknown',
         principal: principal,
         interest_rate: Number(data.interestRate),
         term_months: termMonths,
@@ -182,7 +183,7 @@ export default function AddLoanForm({ onSuccess, onClose }: AddLoanFormProps) {
                   <SelectContent>
                     {members.map((member) => (
                       <SelectItem key={member.id} value={member.id}>
-                        {member.full_name || `${member.first_name} ${member.last_name}`}
+                        {member.member_number} - {member.full_name}
                       </SelectItem>
                     ))}
                   </SelectContent>

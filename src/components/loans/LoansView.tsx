@@ -26,10 +26,10 @@ const sampleLoans = [
     interestRate: 1.5, // Changed to monthly rate (1.5% per month)
     term: 12,
     issueDate: '2024-01-01',
-    balance: 35000,
+    outstandingBalance: 35000,
     monthlyPayment: 4583,
     nextPayment: '2024-02-01',
-    status: 'active'
+    status: 'active',
   },
   {
     id: '2',
@@ -40,7 +40,7 @@ const sampleLoans = [
     interestRate: 2, // Changed to monthly rate (2% per month)
     term: 6,
     issueDate: '2023-12-15',
-    balance: 5000,
+    outstandingBalance: 5000,
     monthlyPayment: 5183,
     nextPayment: '2024-01-15',
     status: 'active'
@@ -54,10 +54,10 @@ const sampleLoans = [
     interestRate: 1.5, // Changed to monthly rate (1.5% per month)
     term: 8,
     issueDate: '2023-11-01',
-    balance: 8000,
+    outstandingBalance: 8000,
     monthlyPayment: 3406,
     nextPayment: '2024-01-01',
-    status: 'overdue'
+    status: 'active',
   }
 ];
 
@@ -92,63 +92,45 @@ export default function LoansView() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [refreshKey]); // The fetchLoans call was here, which is not ideal.
 
   const fetchLoans = async () => {
     try {
       const { data, error } = await supabase
         .from('loans')
-        .select('*, users!inner(first_name, last_name, member_no), loan_repayments(amount)')
+        .select('*, users!inner(full_name, member_number), loan_repayments(amount)')
         .order('issue_date', { ascending: false });
 
       if (error) throw error;
 
       const formattedLoans = (data || []).map((loan: any) => {
         // Calculate total repayments
-        const totalRepayments = loan.loan_repayments?.reduce(
-          (sum: number, repayment: any) => sum + parseFloat(repayment.amount),
-          0
-        ) || 0;
+        const totalRepayments = (loan.loan_repayments || []).reduce((sum: number, r: any) => sum + parseFloat(r.amount || 0), 0);
 
-        const principal = parseFloat(loan.principal);
-        const interestRate = parseFloat(loan.interest_rate); // Now this is monthly rate
-        const termMonths = loan.term_months;
-        
-        // Calculate interest based on interest type - NOW USING MONTHLY RATES
-        let totalInterest = 0;
-        if (loan.interest_type === 'flat') {
-          // Flat interest: principal * monthly_rate * term_months
-          totalInterest = principal * (interestRate / 100) * termMonths;
-        } else { 
-          // Declining balance (amortization)
-          const monthlyRate = interestRate / 100; // Monthly rate as decimal
-          const totalPayment = principal * (monthlyRate * Math.pow(1 + monthlyRate, termMonths)) / (Math.pow(1 + monthlyRate, termMonths) - 1);
-          totalInterest = (totalPayment * termMonths) - principal;
-        }
-
+        const principal = parseFloat(loan.principal_amount);
+        const totalInterest = parseFloat(loan.total_interest || 0);
         const totalAmount = principal + totalInterest;
         const outstandingBalance = totalAmount - totalRepayments;
 
-        // Check if loan is overdue
-        const isOverdue = loan.status === 'active' && loan.due_date && new Date(loan.due_date) < new Date();
+        let status = loan.status;
+        if (status !== 'repaid' && outstandingBalance <= 0.01) {
+          status = 'repaid';
+        }
 
         return {
           id: loan.id,
-          loanNo: `LN${loan.id.slice(-3)}`,
-          memberName: `${loan.users.first_name} ${loan.users.last_name}`,
-          memberNo: loan.users.member_no || 'N/A',
+          loanNo: loan.loan_number,
+          memberName: loan.users.full_name,
+          memberNo: loan.users.member_number || 'N/A',
           principal: principal,
-          interestRate: interestRate, // Monthly rate
-          term: termMonths,
+          interestRate: parseFloat(loan.interest_rate),
+          term: loan.term_months,
           issueDate: loan.issue_date,
-          balance: outstandingBalance,
-          monthlyPayment: Math.round(totalAmount / termMonths),
-          nextPayment: loan.due_date,
-          status: isOverdue ? 'overdue' : loan.status,
           interestType: loan.interest_type,
+          status: status,
           outstandingBalance: outstandingBalance,
-          // Add annual equivalent for display if needed
-          annualEquivalentRate: (interestRate * 12).toFixed(1)
+          balance: outstandingBalance,
+          total_interest_calculated: totalInterest,
         };
       });
 
@@ -162,9 +144,9 @@ export default function LoansView() {
 
   const activeLoans = loans.length > 0 ? loans : sampleLoans;
   const totalLoaned = activeLoans.reduce((sum, loan) => sum + loan.principal, 0);
-  const totalOutstanding = activeLoans.reduce((sum, loan) => sum + loan.balance, 0);
-  const activeLoanCount = activeLoans.filter(loan => loan.status === 'active' || loan.status === 'overdue').length;
-  const overdueLoans = activeLoans.filter(loan => loan.status === 'overdue').length;
+  const totalOutstanding = activeLoans.reduce((sum, loan) => sum + (loan.outstandingBalance || 0), 0);
+  const activeLoanCount = activeLoans.filter(loan => loan.status === 'active').length;
+  const repaidLoanCount = activeLoans.filter(loan => loan.status === 'repaid').length;
 
   const filteredLoans = activeLoans.filter(loan => 
     filter === 'all' || loan.status === filter
@@ -278,11 +260,11 @@ export default function LoansView() {
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Overdue</p>
-              <p className="text-2xl font-bold text-destructive mt-2">{overdueLoans}</p>
+              <p className="text-sm font-medium text-muted-foreground">Repaid Loans</p>
+              <p className="text-2xl font-bold text-foreground mt-2">{repaidLoanCount}</p>
             </div>
-            <div className="h-12 w-12 bg-destructive/10 rounded-lg flex items-center justify-center">
-              <ExclamationTriangleIcon className="h-6 w-6 text-destructive" />
+            <div className="h-12 w-12 bg-success/10 rounded-lg flex items-center justify-center">
+              <CurrencyDollarIcon className="h-6 w-6 text-success" />
             </div>
           </div>
         </motion.div>
@@ -296,7 +278,7 @@ export default function LoansView() {
         className="flex items-center space-x-4"
       >
         <span className="text-sm font-medium text-foreground">Filter by status:</span>
-        {['all', 'active', 'overdue', 'completed'].map((status) => (
+        {['all', 'active', 'repaid'].map((status) => (
           <button
             key={status}
             onClick={() => setFilter(status)}
@@ -335,12 +317,6 @@ export default function LoansView() {
                   Balance
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Monthly Payment
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Next Payment
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -376,20 +352,14 @@ export default function LoansView() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-foreground">KES {loan.balance.toLocaleString()}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-foreground">KES {loan.monthlyPayment.toLocaleString()}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-foreground">{new Date(loan.nextPayment).toLocaleDateString()}</div>
+                    <div className="text-sm font-medium text-foreground">KES {loan.outstandingBalance.toLocaleString()}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                      loan.status === 'active' 
-                        ? 'status-active' 
-                        : loan.status === 'overdue'
-                        ? 'status-overdue'
+                      loan.status === 'repaid' 
+                        ? 'status-active'
+                        : loan.status === 'active'
+                        ? 'status-pending'
                         : 'status-inactive'
                     }`}>
                       {loan.status}
